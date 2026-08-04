@@ -234,12 +234,16 @@ export class Renderer {
         ctx.fill();
       }
 
-      // Banner: owner + vault
+      // Banner: owner + vault. The name is dropped while the owner is standing
+      // here, since their own nameplate is already saying the same thing.
+      const ownerHome = Math.hypot(p.x - camp.x, p.y - camp.y) < camp.radius + 1;
       ctx.save();
       ctx.scale(0.1, 0.1);
-      this._label(ctx, `${p.name}`, 0, -camp.radius * 10 - 16, {
-        size: 13, color: camp.color, weight: 800,
-      });
+      if (!ownerHome) {
+        this._label(ctx, `${p.name}`, 0, -camp.radius * 10 - 16, {
+          size: 13, color: camp.color, weight: 800,
+        });
+      }
       this._label(ctx, `${Math.floor(camp.vault)}g`, 0, -camp.radius * 10 - 2, {
         size: 17, color: COLORS.gold, weight: 900,
       });
