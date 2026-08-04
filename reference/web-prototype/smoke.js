@@ -17,7 +17,7 @@
 const path = require('path');
 const { chromium } = require(process.env.PW || '/opt/node22/lib/node_modules/playwright');
 
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(__dirname);
 const FILE = 'file://' + path.join(ROOT, 'dist/goldhunter.html');
 
 const argv = process.argv.slice(2);

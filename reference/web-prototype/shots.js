@@ -10,7 +10,7 @@ const path = require('path');
 const fs = require('fs');
 const { chromium } = require(process.env.PW || '/opt/node22/lib/node_modules/playwright');
 
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(__dirname);
 const argv = process.argv.slice(2);
 const arg = (n, d) => {
   const i = argv.indexOf(`--${n}`);

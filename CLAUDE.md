@@ -4,153 +4,143 @@ Guidance for Claude Code when working in this repository.
 
 ## What this is
 
-GoldHunter is a 4-player, 150-second arena game. Browser only, vanilla ES
-modules, canvas 2D, **zero runtime dependencies**. Players mine gold from coin
-poppers, punch it out of each other, buy upgrades at shops, and bank it at their
-base camp. Highest vault at the whistle wins.
+GoldHunter is a 4-player, 150-second Unity arena game in C#. Players mine gold
+from coin poppers, punch it out of each other, buy upgrades at shops, and bank
+it at their base camp. Highest vault at the whistle wins.
 
-Node is used only for tooling (bundler, tests, screenshots). Playwright drives a
-real Chromium for the tests.
+The repository root **is** the Unity project (`Assets/`, `ProjectSettings/`).
+Built against Unity 2022.3 LTS, C# 9.
+
+`reference/web-prototype/` is the original browser implementation the C# port
+came from. It still runs and still has its own harness, but it is not part of
+the Unity build — treat it as provenance for the balance numbers, not as code
+to keep in sync.
 
 ## Commands
 
 ```bash
-npm run build      # bundle src/ -> dist/goldhunter.html + dist/artifact.html
-npm test           # build + 6 NPC matches + 12 real-keyboard input checks
-npm run balance    # 12-match sweep with per-player detail (tuning aid)
-npm run shots      # regenerate docs/*.png
-npm run dev        # serve source at :8080 (ES modules need http, not file://)
+tools/run-tests.sh                        # the gate for any gameplay change
+tools/run-tests.sh --matches 12 --verbose # balance sweep with per-player detail
+tools/run-tests.sh --difficulty hard
+
+dotnet build tools/UnityStubCheck         # just the compile check
+dotnet run --project tools/CoreTests -c Release -- --matches 6
 ```
 
-`npm test` takes about a minute and is the gate for any gameplay change.
-Playwright resolves from the global install; override with `PW=` and `CHROME=`
-if the environment differs.
+Everything runs without a Unity licence. The .NET SDK is the only requirement.
 
-## Architecture
+## The split, and why it is load-bearing
+
+```
+Assets/Scripts/Core/     plain C#, NO UnityEngine   (asmdef: noEngineReferences: true)
+Assets/Scripts/Unity/    MonoBehaviours and views   (references GoldHunter.Core)
+```
+
+`GoldHunter.Core.asmdef` sets `"noEngineReferences": true`. **Do not remove
+that flag.** It is what stops the simulation from drifting into the engine; the
+moment a `using UnityEngine` appears in `Core/`, compilation fails. That
+constraint is what makes the whole game testable headlessly in milliseconds.
 
 Data flows one way each frame:
 
 ```
-InputHub ──> Controller (keyboard | gamepad | virtual)
-                  │                       ▲
-                  │                       │ NpcBrain writes here
-                  ▼                       │
-              Player.update ──> World.update ──> Fx ──> Renderer + Hud
+IController (keyboard | gamepad | virtual)
+        │                          ▲
+        │                          │ NpcBrain writes here
+        ▼                          │
+   PlayerState.Tick ──> MatchSimulation.Tick ──> ISimulationListener
+                                                        │
+                                                 FxDirector, views, HUD
 ```
-
-The important consequence: **AI and humans are the same code path.** `NpcBrain`
-does not move a player or throw a punch; it writes `want.ax/ay/attack/action`
-into a `VirtualController`, and `Player.update` consumes it exactly as it
-consumes a keyboard. Never add a shortcut that lets the AI bypass `Player`.
-
-| File | Owns |
-| --- | --- |
-| `src/config.js` | Every gameplay number. Nothing else hard-codes one. |
-| `src/core/input.js` | Key/pad polling, tap-vs-hold buttons, virtual controllers |
-| `src/core/fx.js` | Particles, rings, floating text, screen shake, **hit stop** |
-| `src/core/audio.js` | WebAudio synth SFX (no asset files) |
-| `src/game/world.js` | Arena build, sim step, and every multi-entity interaction |
-| `src/game/entities.js` | Per-entity state and presentation timers |
-| `src/game/npc.js` | Utility scoring over seven goals + combat behaviour |
-| `src/game/nav.js` | Nav grid, A\*, string pulling, path following |
-| `src/game/items.js` | Shop catalogue, pricing, purchase application |
-| `src/game/render.js` / `hud.js` | All drawing |
-| `src/ui.js` | Lobby + results DOM screens |
-
-Rule of thumb for where code goes: if it needs to see **more than one entity**
-(punch resolution, deposits, purchases, scoring) it belongs in `world.js`. If it
-only touches one entity's own state, it belongs in `entities.js`.
 
 ## Invariants — do not break these
 
-1. **`src/config.js` is the only place gameplay numbers live.** If you find
-   yourself typing a literal like `0.35` or `150` into a system file, add it to
-   config instead.
-2. **Hit stop scales the simulation clock, not the presentation clock.**
-   `World.update(realDt)` calls `fx.simDt(realDt)` for the simulation and feeds
-   `fx.update()` the *real* dt. Feeding both the same value makes impacts look
-   like frame drops.
-3. **The AI writes to a controller, never to the player.** See above.
-4. **Purchases bill bag first, then vault** (`items.js: funds/buy`). This was a
-   deliberate reversal — see "History" below before changing it back.
+1. **`Core/Config` holds every gameplay number.** If you are typing a literal
+   like `0.35` or `150` into a simulation file, it belongs in a settings class
+   instead, surfaced through `GameConfigAsset`.
+2. **The AI writes to a controller, never to a player.** `NpcBrain` fills a
+   `VirtualController`; `PlayerState` consumes it exactly like a keyboard. Never
+   add a path that lets a brain move a player or throw a punch directly.
+3. **The core raises events; it never draws, plays audio or shakes anything.**
+   Add to `ISimulationListener` and handle it in `FxDirector`.
+4. **Hit stop scales the simulation clock, not the presentation clock.**
+   `MatchSimulation.Tick(realDt)` derives the sim delta via `HitStopClock`.
+   Unity ticks it with `Time.unscaledDeltaTime` and views animate on unscaled
+   time. Feeding both the same scaled value makes impacts look like frame drops.
 5. **Only vault gold scores.** Bag gold is worth nothing at the whistle; the
-   endgame branch in the AI's `bank` scoring depends on this.
-6. **Gold is conserved except at shops.** Poppers are the only source; shop
-   spending is the only sink. If a change makes gold appear or vanish anywhere
-   else, that is a bug.
-7. **Camps are not solid; poppers, shops and rocks are.** Camps must be walkable
-   or nobody can deposit.
-8. **`dist/` is committed and must be rebuilt** whenever `src/` or `styles.css`
-   changes — the standalone build and the artifact are generated from it.
+   AI's endgame banking branch depends on it.
+6. **The gold ledger.** Poppers are the only source. There are exactly two
+   sinks: shop spending, and pickups expiring uncollected
+   (`MatchSimulation.GoldExpired`). Anything else that changes the total is a
+   bug, and `CoreTests` will catch it — it asserts `world + spent + expired`
+   never decreases.
+7. **Purchases bill bag first, then vault** (`ShoppingService`). This was a
+   deliberate reversal — see "History" below before changing it back.
+8. **Camps are not solid; poppers, shops and rocks are.** `StageService` builds
+   the blocker list and deliberately omits camps. `BaseCampManager` destroys any
+   collider on a camp view. A solid camp means nobody can ever deposit.
+
+## Where code goes
+
+| Need | Home |
+| --- | --- |
+| A gameplay number | `Core/Config/*Settings.cs`, surfaced in `GameConfigAsset` |
+| Logic touching one entity's own state | that entity in `Core/Simulation` |
+| Logic touching **two or more** entities | `MatchSimulation` or a service |
+| "Where is the map / what is at this point" | `Core/Services/StageService` |
+| Pricing, funding, affordability | `Core/Services/ShoppingService` |
+| Banking, raiding, standings, final score | `Core/Services/BaseCampService` |
+| Bot decision-making | `Core/Ai/NpcBrain`, `ShopPlanner` |
+| Anything visible or audible | `Unity/Fx/FxDirector`, `Unity/Actors`, `Unity/UI` |
 
 ## Testing approach
 
-Two harnesses, and they catch different things:
+`tools/CoreTests` is the real test suite. It plays complete matches at a fixed
+timestep and asserts behaviour coverage, not just "no crash": bots must move,
+mine, bank, fight, shop, and land at least one vault raid across the sample, and
+nobody may finish with an empty vault. `UnitChecks.cs` adds focused checks on
+arena symmetry, the octagon clamp, tap-vs-hold detection, pathing around
+blockers, hit-stop semantics and the shop's funding order.
 
-- `tools/smoke.js` steps the world directly at a fixed dt with four bots. Fast,
-  deterministic per seed, and it asserts behaviour coverage, not just "no
-  crash": bots must move, mine, bank, fight, shop, and land at least one vault
-  raid across the sample, and nobody may finish with an empty vault. It prints a
-  balance summary; use `--matches N --verbose --difficulty hard`.
-- `tools/input-test.js` presses **real keys in a real browser**. The bot harness
-  drives virtual controllers, so it passes even when keyboard handling is
-  entirely broken — which is exactly the bug it found (a jab tapped and released
-  within one frame was dropped, since polling never saw the key down; fixed by
-  latching presses in `InputHub.keyboardController`).
+`tools/UnityStubCheck` compiles the Unity layer against a hand-written stub
+`UnityEngine` (`tools/UnityStubCheck/UnityEngineStub.cs`). It proves the code
+compiles and the API shapes are right; it proves nothing about runtime behaviour
+in the editor. **If you use a Unity API the stub lacks, add it to the stub** —
+keep the stub faithful to the real signatures, or it will report false errors
+(it already caught two, both missing `Mathf` int overloads).
 
-When tuning balance, run `npm run balance` before and after and compare the
-winner spread and goal-share lines. Healthy targets:
+Healthy balance targets when tuning:
 
-- No archetype wins more than ~half of matches.
-- `mine` 30-45 %, `bank` 20-30 %, `hunt` 15-25 %, `flee` under 10 %.
+- No archetype wins much more than half of matches.
+- `Mine` 30-40 %, `Bank` 20-30 %, `Hunt` 10-20 %, `Flee` under 10 %.
 - Nobody finishes on 0 g; median score roughly 120-220 g.
-- At least one vault raid per few matches (proves the Steal chain works).
+- At least ~1 vault raid per match (proves the Steal chain works end to end).
 
-## The AI, concretely
+## Things that bit during the port
 
-`NpcBrain.evaluate()` scores seven goals and keeps the best:
+- **Partial pickups.** Collecting a floor blob into a nearly-full bag used to
+  delete the whole blob. Always use the return value of `AddGold` and put back
+  or keep what did not fit.
+- **Rounding after moving gold.** Rounding a value *after* taking it out of a
+  bag, vault or popper creates or destroys the difference. Round the request,
+  then move exactly what came back.
+- **`Math.Round` is banker's rounding in C#** (`Round(0.5) == 0`), unlike
+  JavaScript's `Math.round`. Ported numbers can drift slightly because of this.
+- **Unity initialisation order.** `GoldHunterBootstrap` adds `MatchManager`
+  last, so any component resolving it in `Awake` finds nothing. `HudController`
+  resolves lazily for exactly this reason.
+- **A one-frame tap must still register.** `KeyboardController` latches with
+  `GetKey(k) || GetKeyDown(k)`; polling alone drops a jab that starts and ends
+  inside one frame. The browser prototype shipped with that bug.
 
-`mine`, `bank`, `hunt`, `shop`, `raid`, `loot`, `flee`
+## Known balance characteristic
 
-Every score has the shape `value / (travelTime × k + 1)` multiplied by
-personality weights from `NPC_PROFILES`. Small multipliers do a lot of work
-here; change one at a time and re-measure. Hysteresis terms (`this.goal === x &&
-this.target === y`) exist to stop goal thrashing — keep them.
-
-Known couplings that bit during tuning, so watch for them:
-
-- `flee` targets home, and stepping into your own camp **auto-deposits**. Any
-  "run away" behaviour is therefore also a banking behaviour.
-- Making a goal more attractive to every profile can make those bots *worse*
-  (they chase an expensive plan, get robbed, never finish it) while the passive
-  profile quietly wins. Always check the winner spread, not just the goal share.
-- Bots must keep a spending reserve that ramps up as the clock runs down, or
-  they will convert their whole vault into upgrades and finish near zero.
-
-## Rendering notes
-
-- The camera fits the whole octagonal arena; `Renderer.fit()` is
-  height-constrained at typical aspect ratios, which is what leaves room for the
-  four corner HUD cards.
-- World-space text is drawn by scaling the context by `0.1` and using ~10-13 px
-  fonts, so labels stay legible at any zoom. Keep that convention.
-- `ctx.roundRect` is used throughout; `main.js` polyfills it for older Safari.
-- Player HUD cards sit in the screen corner matching their camp (NW/NE/SW/SE).
-- Shop panels open *outward* into the side margin so they never cover the fight.
-
-## Build
-
-`tools/build.js` is a dependency-free bundler: it walks imports from
-`src/main.js`, rewrites `import`/`export` into a tiny module registry (each
-module gets its own scope, so identically-named module-level constants like
-`rng` in `fx.js` and `entities.js` cannot collide), and inlines `styles.css`.
-
-It emits two files: `dist/goldhunter.html` (full standalone page) and
-`dist/artifact.html` (the same page as a body fragment, for publishing as a
-Claude Artifact, which supplies its own `<head>`/`<body>`).
-
-Only relative imports are supported. There is no dead-code elimination and no
-minifier — keep it that way unless there is a reason.
+Coinsworth (Banker) still wins more than its share of bot-only matches —
+turtling is strong when no human is applying pressure. Vault raids are the
+designed counterweight and now fire ~2 per match. If you push on this, change
+one multiplier at a time and re-measure with `--matches 12`; making a goal more
+attractive to *every* profile tends to make those bots worse while the passive
+one quietly wins.
 
 ## History worth knowing
 
@@ -159,11 +149,11 @@ Purchases originally billed the **bag only**, which seemed like nice risk/reward
 
 1. The cheapest item cost more than the 40 g starting bag, so no first purchase
    was ever possible.
-2. After repricing, the bag size became a hard price ceiling. Steal could only
-   be afforded by standing around with a full unbanked bag, which is precisely
-   what rivals punch out of you. Bots hoarded, got robbed, and never bought it —
-   the passive Banker archetype won 10 of 12 matches.
+2. After repricing, bag size became a hard price ceiling. Steal could only be
+   afforded by standing around with a full unbanked bag — precisely what rivals
+   punch out of you. Bots hoarded, got robbed, never bought it, and the passive
+   Banker archetype won 10 of 12 matches.
 
-Billing bag-then-vault fixed both and simplified the AI (an entire hoarding
-subsystem was deleted). If you are tempted to restore bag-only pricing, re-read
-this and run `npm run balance` first.
+Billing bag-then-vault fixed both and deleted an entire hoarding subsystem from
+the AI. If you are tempted to restore bag-only pricing, re-read this and run a
+12-match sweep first.
