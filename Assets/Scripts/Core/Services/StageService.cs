@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System;
 using GoldHunter.Core.Config;
 using GoldHunter.Core.Math;
 using GoldHunter.Core.Navigation;
@@ -6,6 +7,30 @@ using GoldHunter.Core.Simulation;
 
 namespace GoldHunter.Core.Services
 {
+    /// <summary>Arena dimensions. The playfield is an octagon: a square with chamfered corners.</summary>
+    [Serializable]
+    public class ArenaSettings
+    {
+        /// <summary>Half-extent in metres; the arena spans -Half .. +Half on both axes.</summary>
+        public float Half = 35f;
+
+        /// <summary>How much each corner is cut off, forming the octagon.</summary>
+        public float CornerCut = 9f;
+
+        /// <summary>Distance from the centre popper to each base camp.</summary>
+        public float CampRadius = 25f;
+
+        /// <summary>Restitution when a player is shoved off a wall or blocker.</summary>
+        public float WallBounce = 0.25f;
+
+        /// <summary>
+        /// The chamfer constraint: a point is inside the octagon when
+        /// <c>|x| + |y| &lt;= DiagonalLimit</c>. Derived here so the bounds check
+        /// and the physics clamp cannot drift apart.
+        /// </summary>
+        public float DiagonalLimit => Half * 2f - CornerCut;
+    }
+
     /// <summary>
     /// The stage: everything about the map's shape and what is where.
     ///
@@ -233,7 +258,7 @@ namespace GoldHunter.Core.Services
             // Chamfered corners: |x| + |y| <= D. Moving along (sign x, sign y) by t
             // changes that sum by 2t, so the correction is half the overshoot.
             const float diagonal = 0.70710678f;
-            float d = _config.Arena.Half * 2f - _config.Arena.CornerCut - bodyRadius * 1.41421356f;
+            float d = _config.Arena.DiagonalLimit - bodyRadius * 1.41421356f;
             float sum = GhMath.Abs(position.X) + GhMath.Abs(position.Y);
             if (sum > d)
             {

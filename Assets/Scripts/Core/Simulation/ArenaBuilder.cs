@@ -39,9 +39,12 @@ namespace GoldHunter.Core.Simulation
         {
             return new List<CoinPopper>
             {
-                new CoinPopper(PopperKind.Motherlode, Vec2.Zero, config.Motherlode, "MOTHERLODE"),
-                new CoinPopper(PopperKind.Small, new Vec2(0f, -20f), config.SmallPopper, "NORTH"),
-                new CoinPopper(PopperKind.Small, new Vec2(0f, 20f), config.SmallPopper, "SOUTH"),
+                new CoinPopper(PopperKind.Motherlode, Vec2.Zero,
+                    config.ForKind(PopperKind.Motherlode), "MOTHERLODE"),
+                new CoinPopper(PopperKind.Small, new Vec2(0f, -20f),
+                    config.ForKind(PopperKind.Small), "NORTH"),
+                new CoinPopper(PopperKind.Small, new Vec2(0f, 20f),
+                    config.ForKind(PopperKind.Small), "SOUTH"),
             };
         }
 

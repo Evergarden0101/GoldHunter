@@ -1,5 +1,6 @@
 using System.Collections.Generic;
-using GoldHunter.Core.Config;
+using GoldHunter.Core.Ai;
+using GoldHunter.Core.Services;
 using UnityEngine;
 
 namespace GoldHunter.Unity.Config

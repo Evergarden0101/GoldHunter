@@ -1,10 +1,73 @@
 using System.Collections.Generic;
+using System;
+using GoldHunter.Core.Ai;
 using GoldHunter.Core.Config;
 using GoldHunter.Core.Input;
 using GoldHunter.Core.Math;
+using GoldHunter.Core.Services;
 
 namespace GoldHunter.Core.Simulation
 {
+    /// <summary>Movement, carrying and dash tuning shared by humans and NPCs.</summary>
+    [Serializable]
+    public class PlayerSettings
+    {
+        public float Radius = 1.2f;
+        public float Speed = 6.2f;
+        public float Acceleration = 46f;
+        public float Friction = 12f;
+
+        /// <summary>Gold a player can carry before an upgrade.</summary>
+        public float BagCapacity = 40f;
+
+        /// <summary>Speed penalty at a completely full bag (0.12 = 12% slower).</summary>
+        public float FullBagSlowdown = 0.12f;
+
+        public float TurnRate = 14f;
+        public float StunTime = 0.42f;
+        public float InvulnerabilityAfterHit = 0.55f;
+        public float KnockbackDecay = 5.5f;
+
+        public float DashSpeed = 15.5f;
+        public float DashTime = 0.16f;
+        public float DashCooldown = 2.4f;
+    }
+
+    /// <summary>What one level of each upgrade actually does.</summary>
+    [Serializable]
+    public class UpgradeSettings
+    {
+        /// <summary>Extra gold ripped and knockback dealt, per Attack Up level.</summary>
+        public float AttackPerLevel = 0.22f;
+
+        /// <summary>Gold-loss reduction per Defense Up level (compounding).</summary>
+        public float DefensePerLevel = 0.18f;
+
+        /// <summary>Carry capacity added per Gold Bag Up level.</summary>
+        public float BagPerLevel = 25f;
+
+        /// <summary>Vault theft reduction per Base Camp Up level (compounding).</summary>
+        public float CampArmorPerLevel = 0.3f;
+
+        /// <summary>Deposit speed added per Base Camp Up level.</summary>
+        public float CampDepositPerLevel = 0.35f;
+
+        /// <summary>End-of-match vault bonus per Base Camp Up level.</summary>
+        public float CampEndBonusPerLevel = 0.04f;
+
+        /// <summary>Size delta per scale level (Scale Up positive, Scale Down negative).</summary>
+        public float ScaleStep = 0.16f;
+
+        /// <summary>Speed change per scale level. Negative: bigger is slower.</summary>
+        public float ScaleSpeedPerLevel = -0.1f;
+
+        /// <summary>Punch power change per scale level.</summary>
+        public float ScalePowerPerLevel = 0.18f;
+
+        /// <summary>Reach change per scale level.</summary>
+        public float ScaleReachPerLevel = 0.22f;
+    }
+
     /// <summary>
     /// A prospector. Owns its own movement, punch state machine, bag and
     /// upgrades — anything that needs to see a second entity (resolving a hit,
@@ -141,8 +204,8 @@ namespace GoldHunter.Core.Simulation
             get
             {
                 if (!IsCharging) return 0f;
-                float span = _config.Combat.ChargeFull - _config.Combat.ChargeMinHold;
-                return GhMath.Clamp01((ChargeTime - _config.Combat.ChargeMinHold) / span);
+                return GhMath.Clamp01(
+                    (ChargeTime - _config.Combat.ChargeMinHold) / _config.Combat.ChargeSpan);
             }
         }
 
@@ -374,8 +437,8 @@ namespace GoldHunter.Core.Simulation
                 IsCharging = false;
                 ChargeTime = 0f;
 
-                float span = _config.Combat.ChargeFull - _config.Combat.ChargeMinHold;
-                float ratio = GhMath.Clamp01((held - _config.Combat.ChargeMinHold) / span);
+                float ratio = GhMath.Clamp01(
+                    (held - _config.Combat.ChargeMinHold) / _config.Combat.ChargeSpan);
                 PunchPower = held < _config.Combat.ChargeMinHold ? 0f : GhMath.Max(0.001f, ratio);
 
                 Phase = AttackPhase.Windup;

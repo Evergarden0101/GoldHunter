@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using GoldHunter.Core.Ai;
 using GoldHunter.Core.Config;
 using GoldHunter.Core.Input;
 using GoldHunter.Core.Math;

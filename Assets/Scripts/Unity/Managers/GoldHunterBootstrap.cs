@@ -98,6 +98,7 @@ namespace GoldHunter.Unity.Managers
             GetOrAdd<PlayerViewSpawner>();
             GetOrAdd<CoinPopperViewSpawner>();
             GetOrAdd<HudController>();
+            GetOrAdd<NpcDebugView>();
             GetOrAdd<MatchManager>();
         }
 

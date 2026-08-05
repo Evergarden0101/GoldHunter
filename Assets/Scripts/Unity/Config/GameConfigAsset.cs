@@ -1,4 +1,7 @@
 using GoldHunter.Core.Config;
+using GoldHunter.Core.Navigation;
+using GoldHunter.Core.Services;
+using GoldHunter.Core.Simulation;
 using UnityEngine;
 
 namespace GoldHunter.Unity.Config

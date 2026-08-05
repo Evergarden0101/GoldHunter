@@ -154,7 +154,7 @@ namespace GoldHunter.Unity.Fx
         {
             Play(_buyClip, 0.6f);
             Burst(_goldParticles, evt.Buyer.Position, 12);
-            if (evt.Item.Id == Core.Config.ItemId.Steal)
+            if (evt.Item.Id == Core.Services.ItemId.Steal)
             {
                 PushTicker($"{evt.Buyer.Name} bought STEAL — vaults are no longer safe");
             }

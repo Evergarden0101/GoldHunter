@@ -74,7 +74,16 @@ attack will, save-gold will, steal will, shop will, greed, caution, and per-item
 shopping taste. **GoldHunter ▸ Difficulty** scales how *well* bots execute
 (reaction time, aim jitter, charge discipline) without changing what they want.
 
-No gameplay value is hard-coded anywhere outside `GameConfig`.
+No gameplay value is hard-coded anywhere outside these settings classes, and
+each one lives in the same file as the logic that consumes it — `CoinPopperSettings`
+sits at the top of `CoinPopper.cs`, `CombatSettings` at the top of
+`CombatResolver.cs` — so a knob and its effect are read together.
+
+Values *derived* from a tunable are properties (`GoldPerSecond`, `ChargeSpan`,
+`DiagonalLimit`). The raw tunables themselves are public fields because Unity
+serialises fields and never properties, and the core cannot use
+`[field: SerializeField]` — it has no UnityEngine reference by design. Making
+them auto-properties would compile and then silently vanish from the Inspector.
 
 ---
 
@@ -118,11 +127,12 @@ layer decides what that looks like.
 
 | Folder | Owns |
 | --- | --- |
-| `Core/Config` | Every gameplay number, as serializable plain classes |
+| `Core/Config` | `GameConfig`, the aggregate root that hands out settings |
 | `Core/Math` | `Vec2`, easing, seeded RNG, collision helpers |
 | `Core/Input` | `IController`, edge-detected buttons, `VirtualController` |
 | `Core/Navigation` | Nav grid, A\*, string pulling, path following, separation |
 | `Core/Simulation` | The match: entities, combat resolution, arena build |
+| | *Each settings class lives beside the logic that reads it* |
 | `Core/Services` | **StageService**, **ShoppingService**, **BaseCampService** |
 | `Core/Ai` | Utility scoring over seven goals, shop planning |
 | `Core/Events` | The listener contract and its event structs |

@@ -1,4 +1,4 @@
-using GoldHunter.Core.Config;
+using GoldHunter.Core.Ai;
 using GoldHunter.Core.Input;
 
 namespace GoldHunter.Core.Simulation

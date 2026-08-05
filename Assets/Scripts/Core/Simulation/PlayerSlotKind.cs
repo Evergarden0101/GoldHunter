@@ -1,3 +1,5 @@
+
+
 namespace GoldHunter.Core.Simulation
 {
     /// <summary>Who is driving a seat.</summary>

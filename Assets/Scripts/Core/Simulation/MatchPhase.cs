@@ -1,3 +1,5 @@
+
+
 namespace GoldHunter.Core.Simulation
 {
     /// <summary>Where a match is in its lifecycle.</summary>

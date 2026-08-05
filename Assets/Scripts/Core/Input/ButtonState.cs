@@ -1,3 +1,5 @@
+
+
 namespace GoldHunter.Core.Input
 {
     /// <summary>

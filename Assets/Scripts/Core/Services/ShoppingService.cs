@@ -1,10 +1,152 @@
 using System.Collections.Generic;
+using System;
 using GoldHunter.Core.Config;
 using GoldHunter.Core.Math;
 using GoldHunter.Core.Simulation;
 
 namespace GoldHunter.Core.Services
 {
+    /// <summary>Shop footprint and the buy interaction.</summary>
+    [Serializable]
+    public class ShopSettings
+    {
+        /// <summary>Physical body radius (solid).</summary>
+        public float Radius = 3f;
+
+        /// <summary>Distance at which the shop panel opens.</summary>
+        public float BrowseRange = 4.6f;
+
+        /// <summary>How long the punch button must be held to confirm a purchase.</summary>
+        public float BuyHoldSeconds = 0.45f;
+
+        /// <summary>Debounce between selection changes.</summary>
+        public float CycleCooldown = 0.12f;
+    }
+
+    /// <summary>
+    /// One row of the shop catalogue. Price is linear in the level already owned:
+    /// <c>BasePrice + level * PriceStep</c>, so a flat-priced item just uses step 0.
+    /// </summary>
+    [Serializable]
+    public class ShopItemDefinition
+    {
+        public ItemId Id = ItemId.AttackUp;
+        public string DisplayName = "Attack Up";
+        public string Description = "";
+
+        /// <summary>Price of the first level.</summary>
+        public float BasePrice = 28f;
+
+        /// <summary>Added to the price for each level already owned.</summary>
+        public float PriceStep = 24f;
+
+        /// <summary>How many levels can be bought.</summary>
+        public int MaxLevel = 4;
+
+        public int PriceAtLevel(int level)
+        {
+            return (int)System.Math.Round(BasePrice + level * PriceStep);
+        }
+    }
+
+    /// <summary>
+    /// The full shop shelf. Kept as data so pricing can be retuned in the
+    /// Inspector; nothing in the simulation hard-codes an item price.
+    /// </summary>
+    [Serializable]
+    public class ShopCatalogue
+    {
+        public List<ShopItemDefinition> Items = new List<ShopItemDefinition>();
+
+        public ShopItemDefinition Find(ItemId id)
+        {
+            for (int i = 0; i < Items.Count; i++)
+            {
+                if (Items[i].Id == id) return Items[i];
+            }
+            return null;
+        }
+
+        public int IndexOf(ItemId id)
+        {
+            for (int i = 0; i < Items.Count; i++)
+            {
+                if (Items[i].Id == id) return i;
+            }
+            return -1;
+        }
+
+        public int Count => Items.Count;
+
+        /// <summary>
+        /// Default catalogue. Tier-one upgrades sit under the 40g starting bag so a
+        /// first purchase is always possible; Steal is the expensive prize.
+        /// </summary>
+        public static ShopCatalogue Default()
+        {
+            return new ShopCatalogue
+            {
+                Items = new List<ShopItemDefinition>
+                {
+                    new ShopItemDefinition
+                    {
+                        Id = ItemId.AttackUp, DisplayName = "Attack Up",
+                        Description = "Punches rip +22% more gold and hit harder.",
+                        BasePrice = 28f, PriceStep = 24f, MaxLevel = 4,
+                    },
+                    new ShopItemDefinition
+                    {
+                        Id = ItemId.DefenseUp, DisplayName = "Defense Up",
+                        Description = "Lose 18% less gold per hit, shrug off knockback.",
+                        BasePrice = 28f, PriceStep = 24f, MaxLevel = 4,
+                    },
+                    new ShopItemDefinition
+                    {
+                        Id = ItemId.GoldBagUp, DisplayName = "Gold Bag Up",
+                        Description = "+25 carry capacity.",
+                        BasePrice = 30f, PriceStep = 26f, MaxLevel = 4,
+                    },
+                    new ShopItemDefinition
+                    {
+                        Id = ItemId.BaseCampUp, DisplayName = "Base Camp Up",
+                        Description = "Vault armour, faster deposits, +4% end bonus.",
+                        BasePrice = 36f, PriceStep = 34f, MaxLevel = 3,
+                    },
+                    new ShopItemDefinition
+                    {
+                        Id = ItemId.ScaleUp, DisplayName = "Scale Up",
+                        Description = "Bigger: more reach, more knockback, slower.",
+                        BasePrice = 34f, PriceStep = 0f, MaxLevel = 3,
+                    },
+                    new ShopItemDefinition
+                    {
+                        Id = ItemId.ScaleDown, DisplayName = "Scale Down",
+                        Description = "Smaller: faster, harder to hit, weaker punch.",
+                        BasePrice = 34f, PriceStep = 0f, MaxLevel = 3,
+                    },
+                    new ShopItemDefinition
+                    {
+                        Id = ItemId.Steal, DisplayName = "Steal",
+                        Description = "Punch enemy base camps to rob their vault.",
+                        BasePrice = 52f, PriceStep = 0f, MaxLevel = 1,
+                    },
+                },
+            };
+        }
+    }
+
+    /// <summary>Every purchasable upgrade. Order here is the order shown in the shop.</summary>
+    public enum ItemId
+    {
+        AttackUp = 0,
+        DefenseUp = 1,
+        GoldBagUp = 2,
+        BaseCampUp = 3,
+        ScaleUp = 4,
+        ScaleDown = 5,
+        Steal = 6,
+    }
+
     /// <summary>
     /// All shop rules in one place: what something costs, whether it can be
     /// bought, and where the gold comes from.

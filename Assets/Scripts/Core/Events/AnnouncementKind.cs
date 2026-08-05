@@ -1,3 +1,5 @@
+
+
 namespace GoldHunter.Core.Events
 {
     /// <summary>Banner-worthy moments the presentation layer may want to dramatise.</summary>

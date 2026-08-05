@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using GoldHunter.Core.Config;
 using GoldHunter.Core.Math;
 
 namespace GoldHunter.Core.Navigation

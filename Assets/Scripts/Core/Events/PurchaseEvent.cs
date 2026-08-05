@@ -1,4 +1,4 @@
-using GoldHunter.Core.Config;
+using GoldHunter.Core.Services;
 using GoldHunter.Core.Simulation;
 
 namespace GoldHunter.Core.Events

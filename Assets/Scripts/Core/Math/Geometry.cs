@@ -1,3 +1,5 @@
+
+
 namespace GoldHunter.Core.Math
 {
     /// <summary>Collision and visibility helpers used by physics and navigation.</summary>

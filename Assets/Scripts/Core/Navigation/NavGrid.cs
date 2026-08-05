@@ -1,9 +1,30 @@
 using System.Collections.Generic;
-using GoldHunter.Core.Config;
+using System;
 using GoldHunter.Core.Math;
+using GoldHunter.Core.Services;
 
 namespace GoldHunter.Core.Navigation
 {
+    /// <summary>Nav grid resolution and path-following tolerances for the NPCs.</summary>
+    [Serializable]
+    public class NavigationSettings
+    {
+        /// <summary>A* grid cell size in metres.</summary>
+        public float CellSize = 1.4f;
+
+        /// <summary>Blockers are inflated by this before rasterising, so paths never clip corners.</summary>
+        public float AgentClearance = 1f;
+
+        /// <summary>Seconds between repaths while following a goal.</summary>
+        public float RepathInterval = 0.55f;
+
+        /// <summary>Distance at which a waypoint counts as reached.</summary>
+        public float WaypointReach = 1.1f;
+
+        /// <summary>Safety valve on A* expansion.</summary>
+        public int MaxSearchNodes = 20000;
+    }
+
     /// <summary>
     /// Rasterises the arena's static blockers into a walkability grid and answers
     /// line-of-sight queries.
@@ -70,7 +91,7 @@ namespace GoldHunter.Core.Navigation
         {
             float h = _arena.Half - margin;
             if (p.X < -h || p.X > h || p.Y < -h || p.Y > h) return false;
-            float diagonal = _arena.Half * 2f - _arena.CornerCut - margin * 1.42f;
+            float diagonal = _arena.DiagonalLimit - margin * 1.42f;
             return GhMath.Abs(p.X) + GhMath.Abs(p.Y) <= diagonal;
         }
 

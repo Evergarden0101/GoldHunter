@@ -1,8 +1,68 @@
-using GoldHunter.Core.Config;
+using System;
 using GoldHunter.Core.Math;
 
 namespace GoldHunter.Core.Simulation
 {
+    /// <summary>
+    /// Per-kind coin popper tuning. Every field here is surfaced in the Unity
+    /// Inspector, so popping speed can be retuned without touching code.
+    /// </summary>
+    [Serializable]
+    public class CoinPopperSettings
+    {
+        /// <summary>Gold present the moment the match starts.</summary>
+        public float StartingGold = 50f;
+
+        /// <summary>Generation rate. This is the "coin popping speed".</summary>
+        public float GoldPerMinute = 200f;
+
+        /// <summary>Maximum gold the machine will hold.</summary>
+        public float Capacity = 320f;
+
+        /// <summary>Gold per second siphoned into a bag by a player standing in range.</summary>
+        public float HarvestRatePerSecond = 34f;
+
+        /// <summary>Physical body radius (solid).</summary>
+        public float Radius = 2.5f;
+
+        /// <summary>How far from the centre a player can stand and still mine.</summary>
+        public float HarvestRange = 3.9f;
+
+        /// <summary>Seconds between visible "pop" jolts while generating.</summary>
+        public float PopInterval = 0.34f;
+
+        public float GoldPerSecond => GoldPerMinute / 60f;
+
+        public static CoinPopperSettings Motherlode() => new CoinPopperSettings
+        {
+            StartingGold = 50f,
+            GoldPerMinute = 200f,
+            Capacity = 320f,
+            HarvestRatePerSecond = 34f,
+            Radius = 2.5f,
+            HarvestRange = 3.9f,
+            PopInterval = 0.34f,
+        };
+
+        public static CoinPopperSettings Small() => new CoinPopperSettings
+        {
+            StartingGold = 20f,
+            GoldPerMinute = 80f,
+            Capacity = 160f,
+            HarvestRatePerSecond = 26f,
+            Radius = 1.7f,
+            HarvestRange = 3.1f,
+            PopInterval = 0.6f,
+        };
+    }
+
+    /// <summary>Coin poppers come in two sizes with independent tuning.</summary>
+    public enum PopperKind
+    {
+        Motherlode = 0,
+        Small = 1,
+    }
+
     /// <summary>
     /// A gold machine. Generates continuously at its configured rate, can be
     /// siphoned by anyone standing in range, and rattles when worked or hit.
@@ -28,7 +88,6 @@ namespace GoldHunter.Core.Simulation
         public float HarvestRange => _settings.HarvestRange;
         public float Capacity => _settings.Capacity;
         public float GoldPerMinute => _settings.GoldPerMinute;
-        public CoinPopperSettings Settings => _settings;
         public float FillRatio => _settings.Capacity <= 0f ? 0f : GhMath.Clamp01(Gold / _settings.Capacity);
 
         public CoinPopper(PopperKind kind, Vec2 position, CoinPopperSettings settings, string label)

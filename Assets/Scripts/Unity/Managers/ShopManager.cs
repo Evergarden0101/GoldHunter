@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using GoldHunter.Core.Config;
 using GoldHunter.Core.Events;
 using GoldHunter.Core.Services;
 using GoldHunter.Core.Simulation;

@@ -1,3 +1,5 @@
+
+
 namespace GoldHunter.Core.Services
 {
     /// <summary>What a world position can be standing on or next to.</summary>

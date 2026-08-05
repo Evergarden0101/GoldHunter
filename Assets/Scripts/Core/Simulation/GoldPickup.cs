@@ -1,9 +1,34 @@
 using System.Collections.Generic;
-using GoldHunter.Core.Config;
+using System;
 using GoldHunter.Core.Math;
 
 namespace GoldHunter.Core.Simulation
 {
+    /// <summary>Loose gold lying on the floor after a punch or a popper hit.</summary>
+    [Serializable]
+    public class PickupSettings
+    {
+        public float Radius = 0.42f;
+        public float MagnetRange = 2.2f;
+        public float MagnetSpeed = 13f;
+
+        /// <summary>Seconds before an uncollected coin blob evaporates.</summary>
+        public float Lifetime = 22f;
+
+        public float ScatterSpeedMin = 3.5f;
+        public float ScatterSpeedMax = 8.5f;
+        public float Drag = 3.4f;
+
+        /// <summary>Gold per dropped blob; larger drops split into several.</summary>
+        public float ClumpSize = 12f;
+
+        /// <summary>Grace period before the victim can re-collect their own dropped gold.</summary>
+        public float OwnerPickupDelay = 0.35f;
+
+        /// <summary>Safety cap so the floor cannot fill with thousands of blobs.</summary>
+        public int MaxActive = 160;
+    }
+
     /// <summary>
     /// A blob of gold on the floor. Drifts, is magnetically drawn to nearby
     /// players, and evaporates if nobody claims it.
@@ -22,8 +47,6 @@ namespace GoldHunter.Core.Simulation
 
         public float OwnerLockout;
         public bool IsDead { get; private set; }
-
-        public bool IsFading => Life < 3f;
 
         public GoldPickup(Vec2 position, Vec2 velocity, float amount, int ownerIndex, PickupSettings settings)
         {
@@ -72,7 +95,5 @@ namespace GoldHunter.Core.Simulation
 
             Position += Velocity * dt;
         }
-
-        public void Kill() => IsDead = true;
     }
 }

@@ -1,4 +1,4 @@
-using GoldHunter.Core.Config;
+using GoldHunter.Core.Ai;
 using UnityEngine;
 
 namespace GoldHunter.Unity.Config

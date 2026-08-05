@@ -1,4 +1,4 @@
-using GoldHunter.Core.Config;
+
 
 namespace GoldHunter.Core.Services
 {

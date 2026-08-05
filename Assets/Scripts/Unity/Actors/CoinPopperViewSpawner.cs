@@ -48,7 +48,7 @@ namespace GoldHunter.Unity.Actors
                 var renderer = go.GetComponent<Renderer>();
                 if (renderer != null)
                 {
-                    renderer.material.color = popper.Kind == Core.Config.PopperKind.Motherlode
+                    renderer.material.color = popper.Kind == Core.Simulation.PopperKind.Motherlode
                         ? _motherlodeColor
                         : _smallPopperColor;
                 }

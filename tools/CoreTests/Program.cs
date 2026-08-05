@@ -1,9 +1,10 @@
-using System;
 using System.Collections.Generic;
+using System;
 using GoldHunter.Core.Ai;
 using GoldHunter.Core.Config;
 using GoldHunter.Core.Input;
 using GoldHunter.Core.Math;
+using GoldHunter.Core.Services;
 using GoldHunter.Core.Simulation;
 
 namespace GoldHunter.CoreTests
@@ -59,6 +60,7 @@ namespace GoldHunter.CoreTests
             public int ShopVisits;
             public float Spent;
             public int PathFailures;
+            public int StuckBots;
             public IReadOnlyList<MatchResultRow> Rows;
         }
 
@@ -142,11 +144,16 @@ namespace GoldHunter.CoreTests
             report.Phase = sim.Phase;
             report.Rows = sim.Results;
             for (int i = 0; i < sim.Players.Count; i++) report.Spent += sim.Players[i].Stats.Spent;
-            for (int i = 0; i < sim.Brains.Count; i++) if (sim.Brains[i].PathFailed) report.PathFailures++;
+            for (int i = 0; i < sim.Brains.Count; i++)
+            {
+                if (sim.Brains[i].PathFailed) report.PathFailures++;
+                if (sim.Brains[i].StuckTimer > 0.4f) report.StuckBots++;
+            }
 
             if (sim.Phase != MatchPhase.Ended) failures.Add("a match never reached the end state");
             if (report.Rows == null || report.Rows.Count != 4) failures.Add("results were not produced");
             if (report.PathFailures > 0) failures.Add($"{report.PathFailures} bots ended with an unreachable path");
+            if (report.StuckBots > 0) failures.Add($"{report.StuckBots} bots ended the match wedged in place");
             for (int i = 0; i < 4; i++)
             {
                 if (report.DistanceMoved[i] < 60f)

@@ -1,3 +1,5 @@
+using System;
+
 // A minimal stand-in for the slice of UnityEngine the Unity layer touches.
 //
 // Unity is not installed in CI, so without this the ~15 MonoBehaviour files
@@ -8,7 +10,6 @@
 //
 // It asserts nothing about behaviour — it only has to have the right shape.
 
-using System;
 
 namespace UnityEngine
 {

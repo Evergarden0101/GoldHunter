@@ -1,3 +1,5 @@
+
+
 namespace GoldHunter.Core.Simulation
 {
     /// <summary>Per-player tallies, shown on the results board.</summary>

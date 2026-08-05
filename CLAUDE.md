@@ -55,9 +55,18 @@ IController (keyboard | gamepad | virtual)
 
 ## Invariants — do not break these
 
-1. **`Core/Config` holds every gameplay number.** If you are typing a literal
-   like `0.35` or `150` into a simulation file, it belongs in a settings class
-   instead, surfaced through `GameConfigAsset`.
+1. **A settings class holds every gameplay number, and lives beside its
+   consumer.** `CoinPopperSettings` is at the top of `CoinPopper.cs`,
+   `CombatSettings` at the top of `CombatResolver.cs`, and so on; `Core/Config`
+   holds only the `GameConfig` aggregate root. If you are typing a literal like
+   `0.35` or `150` into a simulation file, it belongs in that file's settings
+   class instead, surfaced through `GameConfigAsset`.
+   **Tunables are public fields, deliberately.** Unity serialises public fields
+   of a `[Serializable]` class and never properties, and the core cannot use
+   `[field: SerializeField]` because it has no UnityEngine reference. Convert
+   one to an auto-property and it compiles, then quietly disappears from the
+   Inspector. Anything *derived* from a tunable should be a property
+   (`GoldPerSecond`, `ChargeSpan`, `DiagonalLimit`).
 2. **The AI writes to a controller, never to a player.** `NpcBrain` fills a
    `VirtualController`; `PlayerState` consumes it exactly like a keyboard. Never
    add a path that lets a brain move a player or throw a punch directly.
@@ -84,7 +93,7 @@ IController (keyboard | gamepad | virtual)
 
 | Need | Home |
 | --- | --- |
-| A gameplay number | `Core/Config/*Settings.cs`, surfaced in `GameConfigAsset` |
+| A gameplay number | the settings class atop the file that reads it, surfaced in `GameConfigAsset` |
 | Logic touching one entity's own state | that entity in `Core/Simulation` |
 | Logic touching **two or more** entities | `MatchSimulation` or a service |
 | "Where is the map / what is at this point" | `Core/Services/StageService` |

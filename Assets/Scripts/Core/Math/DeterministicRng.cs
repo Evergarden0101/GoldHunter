@@ -1,3 +1,5 @@
+
+
 namespace GoldHunter.Core.Math
 {
     /// <summary>
@@ -27,14 +29,6 @@ namespace GoldHunter.Core.Math
         }
 
         public float Range(float lo, float hi) => lo + Next() * (hi - lo);
-
-        public int RangeInt(int lowInclusive, int highExclusive)
-        {
-            if (highExclusive <= lowInclusive) return lowInclusive;
-            return lowInclusive + (int)(Next() * (highExclusive - lowInclusive));
-        }
-
-        public bool Chance(float probability) => Next() < probability;
 
         public float Angle() => Next() * GhMath.Tau;
     }

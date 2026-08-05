@@ -1,6 +1,6 @@
 using System.Collections.Generic;
-using GoldHunter.Core.Config;
 using GoldHunter.Core.Math;
+using GoldHunter.Core.Services;
 
 namespace GoldHunter.Core.Simulation
 {
