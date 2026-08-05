@@ -1,0 +1,16 @@
+{
+    "name": "GoldHunter.Unity",
+    "rootNamespace": "GoldHunter.Unity",
+    "references": [
+        "GoldHunter.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

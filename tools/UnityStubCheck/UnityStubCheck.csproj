@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Compiles the Unity layer against a stub UnityEngine.
+
+    Unity is not available in CI, so this is what stops a typo in a
+    MonoBehaviour from sitting undiscovered until someone opens the editor.
+    It proves the code compiles and the API shapes are right; it cannot prove
+    anything about runtime behaviour in the engine.
+  -->
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <LangVersion>9.0</LangVersion>
+    <AssemblyName>GoldHunter.UnityStubCheck</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- The stub intentionally has empty method bodies and unused parameters. -->
+    <NoWarn>CS0067;CS0169;CS0649;CS0414;CS1717;CS0660;CS0661</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="UnityEngineStub.cs" />
+    <Compile Include="../../Assets/Scripts/Core/**/*.cs" />
+    <Compile Include="../../Assets/Scripts/Unity/**/*.cs" />
+  </ItemGroup>
+
+</Project>

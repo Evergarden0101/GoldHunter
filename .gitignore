@@ -1,0 +1,32 @@
+# Unity
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+sysinfo.txt
+crashlytics-build.properties
+
+# Keep the hand-written tool projects, which are not Unity-generated
+!tools/CoreTests/GoldHunter.CoreTests.csproj
+!tools/UnityStubCheck/UnityStubCheck.csproj
+
+# .NET build output
+bin/
+[Oo]bj/
+
+# Node (web prototype)
+node_modules/
+*.log
+.DS_Store

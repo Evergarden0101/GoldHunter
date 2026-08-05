@@ -1,0 +1,4719 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GoldHunter — 4-player gold rush brawler</title>
+<meta name="description" content="A 2.5 minute, 4-player arena game: mine gold, punch it out of your rivals, upgrade at the shops, and bank more than anyone else.">
+<style>
+:root {
+  --gold: #ffc939;
+  --ink: #070911;
+  --panel: rgba(14, 18, 28, 0.94);
+  --line: rgba(140, 156, 196, 0.22);
+  --text: #e8ecf7;
+  --dim: #98a3c0;
+  --font: "Trebuchet MS", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #070911;
+  color: var(--text);
+  font-family: var(--font);
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  overflow: auto;
+  background: radial-gradient(ellipse at 50% 0%, rgba(255, 201, 57, 0.07), transparent 60%),
+              rgba(5, 7, 13, 0.72);
+  backdrop-filter: blur(3px);
+  z-index: 5;
+}
+.overlay.show { display: flex; }
+
+.panel {
+  width: min(1080px, 100%);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 22px 26px 18px;
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.62);
+}
+
+.panel header { text-align: center; margin-bottom: 14px; }
+
+h1 {
+  margin: 0;
+  font-size: clamp(34px, 6vw, 58px);
+  letter-spacing: 3px;
+  font-weight: 900;
+  color: var(--gold);
+  text-shadow: 0 4px 0 rgba(0, 0, 0, 0.45);
+}
+h1 span { color: var(--text); }
+
+.tagline { margin: 6px 0 0; color: var(--dim); font-size: 14px; }
+
+/* ---------------------------------------------------------------- lobby */
+
+.slots {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin: 16px 0;
+}
+@media (max-width: 780px) { .slots { grid-template-columns: repeat(2, 1fr); } }
+
+.slot {
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--c);
+  border-radius: 12px;
+  padding: 10px 11px 12px;
+  background: rgba(255, 255, 255, 0.028);
+  transition: background 0.15s ease;
+}
+.slot.cpu { background: rgba(255, 255, 255, 0.012); }
+
+.slot-head { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
+.slot-head b { font-size: 15px; letter-spacing: 1px; }
+.chip { width: 13px; height: 13px; border-radius: 4px; background: var(--c); }
+.corner { margin-left: auto; font-size: 10px; color: var(--dim); letter-spacing: 0.4px; }
+
+.toggle { display: flex; gap: 4px; margin-bottom: 9px; }
+.toggle button {
+  flex: 1;
+  padding: 6px 0;
+  font: 800 11px/1 var(--font);
+  letter-spacing: 1px;
+  color: var(--dim);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid transparent;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.toggle button:hover { color: var(--text); background: rgba(255, 255, 255, 0.1); }
+.toggle button.on {
+  color: var(--ink);
+  background: var(--c);
+  border-color: var(--c);
+}
+
+select {
+  width: 100%;
+  padding: 6px 7px;
+  font: 700 12px var(--font);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  cursor: pointer;
+}
+select:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+option { background: #131824; }
+
+.cfg small.hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 10.5px;
+  color: var(--dim);
+  line-height: 1.35;
+  min-height: 26px;
+}
+
+.row.options {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 4px 0 16px;
+}
+.row.options label { font-size: 12px; color: var(--dim); display: flex; align-items: center; gap: 7px; }
+.row.options label select { width: auto; }
+label.check { cursor: pointer; }
+label.check input { accent-color: var(--gold); }
+
+button.start {
+  padding: 12px 26px;
+  font: 900 15px/1 var(--font);
+  letter-spacing: 2px;
+  color: #2a1e02;
+  background: linear-gradient(180deg, #ffd75f, #f0a90f);
+  border: 0;
+  border-radius: 11px;
+  cursor: pointer;
+  box-shadow: 0 5px 0 #9a6c05, 0 12px 26px rgba(255, 180, 40, 0.22);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+button.start:hover { transform: translateY(-1px); box-shadow: 0 6px 0 #9a6c05, 0 14px 30px rgba(255, 180, 40, 0.3); }
+button.start:active { transform: translateY(3px); box-shadow: 0 2px 0 #9a6c05; }
+
+button.ghost {
+  padding: 11px 20px;
+  font: 800 13px/1 var(--font);
+  letter-spacing: 1.5px;
+  color: var(--dim);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  cursor: pointer;
+}
+button.ghost:hover { color: var(--text); border-color: var(--gold); }
+
+kbd {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 2px 6px;
+  font: 700 10px var(--font);
+  color: inherit;
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: 5px;
+  opacity: 0.75;
+}
+
+.rules {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 26px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 700px) { .rules { grid-template-columns: 1fr; } }
+.rules h3 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+.rules ul { margin: 0; padding-left: 16px; }
+.rules li { font-size: 12.5px; color: var(--dim); line-height: 1.6; }
+.rules b { color: var(--text); }
+
+.panel footer {
+  margin-top: 14px;
+  text-align: center;
+  font-size: 11px;
+  color: rgba(150, 162, 195, 0.7);
+}
+
+/* -------------------------------------------------------------- results */
+
+.results table { width: 100%; border-collapse: collapse; margin: 6px 0 18px; }
+.results th {
+  padding: 7px 8px;
+  font-size: 10px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--dim);
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+.results td {
+  padding: 9px 8px;
+  font-size: 13.5px;
+  border-bottom: 1px solid rgba(140, 156, 196, 0.1);
+}
+.results td.n, .results th.n { text-align: right; font-variant-numeric: tabular-nums; }
+.results td.strong { font-weight: 900; color: var(--gold); }
+.results tr.first td { background: rgba(255, 201, 57, 0.08); }
+.results .place {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  line-height: 22px;
+  text-align: center;
+  font-weight: 900;
+  font-size: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+}
+.results tr.first .place { background: var(--gold); color: #2a1e02; }
+.results .dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 7px;
+  vertical-align: middle;
+}
+.results td small { color: var(--dim); font-size: 10.5px; margin-left: 7px; }
+.results .winner { font-size: clamp(28px, 5vw, 46px); }
+
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="overlay" class="overlay"></div>
+<script>
+
+(function () {
+  "use strict";
+  var __defs = {};
+  var __cache = {};
+  function __require(id) {
+    if (__cache[id]) return __cache[id].e;
+    var mod = { e: {} };
+    mod.e.__set = function (obj) { for (var k in obj) mod.e[k] = obj[k]; };
+    __cache[id] = mod;
+    __defs[id](mod.e, __require);
+    return mod.e;
+  }
+
+__defs["src/main.js"] = function (__exports, __require) {
+/**
+ * Game shell: screen flow, the fixed-ish frame loop and global hotkeys.
+ */
+
+const { InputHub } = __require("src/core/input.js");
+const { sfx } = __require("src/core/audio.js");
+const { Renderer } = __require("src/game/render.js");
+const { Hud } = __require("src/game/hud.js");
+const { World } = __require("src/game/world.js");
+const { Ui } = __require("src/ui.js");
+const { label } = __require("src/game/hud.js");
+
+// Safari < 16.4 and older Firefox lack roundRect; the renderer leans on it.
+if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function roundRect(x, y, w, h, r) {
+    const rr = Math.min(typeof r === 'number' ? r : (r?.[0] ?? 0), Math.abs(w) / 2, Math.abs(h) / 2);
+    this.moveTo(x + rr, y);
+    this.arcTo(x + w, y, x + w, y + h, rr);
+    this.arcTo(x + w, y + h, x, y + h, rr);
+    this.arcTo(x, y + h, x, y, rr);
+    this.arcTo(x, y, x + w, y, rr);
+    this.closePath();
+    return this;
+  };
+}
+
+class Game {
+  constructor() {
+    this.canvas = document.getElementById('game');
+    this.renderer = new Renderer(this.canvas);
+    this.hud = new Hud();
+    this.hub = new InputHub(window);
+    this.ui = new Ui(document.getElementById('overlay'), this);
+
+    this.state = 'lobby';
+    this.world = null;
+    this.paused = false;
+    this.showHelp = true;
+    this.debugAI = false;
+    this.resultTimer = 0;
+    this.last = performance.now();
+
+    window.addEventListener('resize', () => this.renderer.resize());
+    window.addEventListener('keydown', (e) => this._hotkeys(e));
+    window.addEventListener('pointerdown', () => sfx.unlock(), { once: false });
+    window.addEventListener('keydown', () => sfx.unlock(), { once: false });
+    window.addEventListener('gamepadconnected', () => { if (this.state === 'lobby') this.ui.showLobby(); });
+
+    this.ui.showLobby();
+    requestAnimationFrame((t) => this.loop(t));
+  }
+
+  _hotkeys(e) {
+    if (e.target && /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+    const k = e.code;
+    if (this.state === 'lobby' && (k === 'Enter' || k === 'NumpadEnter')) { this.startMatch(); return; }
+    if (this.state === 'results') {
+      if (k === 'KeyR' || k === 'Enter') { this.startMatch(); return; }
+      if (k === 'Escape') { this.toLobby(); return; }
+    }
+    if (this.state === 'playing') {
+      if (k === 'KeyP') { this.paused = !this.paused; return; }
+      if (k === 'Escape') { this.toLobby(); return; }
+      if (k === 'KeyH') { this.showHelp = !this.showHelp; return; }
+      if (k === 'F2') { this.debugAI = !this.debugAI; e.preventDefault(); return; }
+    }
+    if (k === 'KeyM') sfx.toggle();
+  }
+
+  startMatch() {
+    sfx.unlock();
+    const setup = this.ui.buildSetup(this.hub);
+    this.world = new World(setup);
+    this.state = 'playing';
+    this.paused = false;
+    this.resultTimer = 0;
+    this.ui.hide();
+    this.renderer.resize();
+  }
+
+  toLobby() {
+    this.state = 'lobby';
+    this.world = null;
+    sfx.chargeStop();
+    this.ui.showLobby();
+  }
+
+  loop(now) {
+    requestAnimationFrame((t) => this.loop(t));
+    let dt = (now - this.last) / 1000;
+    this.last = now;
+    if (!(dt > 0)) dt = 1 / 60;
+    dt = Math.min(dt, 1 / 20);            // long stalls must not teleport anyone
+
+    if (this.state === 'playing' && this.world) {
+      if (!this.paused) {
+        this.hub.update(dt);
+        this.world.update(dt);
+        if (this.world.state === 'ended') {
+          this.resultTimer += dt;
+          if (this.resultTimer > 2.0 && this.state === 'playing') {
+            this.state = 'results';
+            this.ui.showResults(this.world);
+          }
+        }
+      }
+      this._render();
+    } else if (this.world) {
+      // Results screen keeps the arena alive behind the panel.
+      this.world.fx.update(dt);
+      this._render();
+    } else {
+      this._renderIdle();
+    }
+    this.hub.endFrame();
+  }
+
+  _render() {
+    const r = this.renderer;
+    r.draw(this.world, this);
+    this.hud.draw(r.ctx, this.world, { w: r.w, h: r.h }, this);
+    if (this.paused) {
+      const ctx = r.ctx;
+      ctx.fillStyle = 'rgba(6,8,14,0.55)';
+      ctx.fillRect(0, 0, r.w, r.h);
+      label(ctx, 'PAUSED', r.w / 2, r.h / 2 - 10, { size: 54, weight: 900, color: '#eef2ff' });
+      label(ctx, 'P to resume · Esc to quit', r.w / 2, r.h / 2 + 30, { size: 14, weight: 700, color: '#9aa6c4' });
+    }
+  }
+
+  _renderIdle() {
+    const r = this.renderer;
+    const ctx = r.ctx;
+    ctx.setTransform(r.dpr, 0, 0, r.dpr, 0, 0);
+    const g = ctx.createLinearGradient(0, 0, 0, r.h);
+    g.addColorStop(0, '#0d101a');
+    g.addColorStop(1, '#080a11');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, r.w, r.h);
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => { window.game = new Game(); });
+
+};
+
+__defs["src/core/input.js"] = function (__exports, __require) {
+/**
+ * Input layer.
+ *
+ * The rest of the game never reads the keyboard directly: it asks a
+ * `Controller` for an analogue movement vector plus two buttons (ATTACK and
+ * ACTION). Controllers are backed either by a keyboard scheme or by a gamepad,
+ * which is what lets the same Player code drive humans and AI alike (the AI
+ * simply writes into a `VirtualController`).
+ */
+
+const { clamp } = __require("src/core/math.js");
+
+const KEY_SCHEMES = [
+  {
+    id: 'wasd',
+    name: 'WASD',
+    keys: { up: 'KeyW', left: 'KeyA', down: 'KeyS', right: 'KeyD', attack: 'Space', action: 'ShiftLeft' },
+    label: 'WASD · Space punch · Shift dash',
+  },
+  {
+    id: 'ijkl',
+    name: 'IJKL',
+    // Dash is U, not P: P is the global pause hotkey and P2 would keep
+    // freezing the match every time they dashed.
+    keys: { up: 'KeyI', left: 'KeyJ', down: 'KeyK', right: 'KeyL', attack: 'KeyO', action: 'KeyU' },
+    label: 'IJKL · O punch · U dash',
+  },
+  {
+    id: 'arrows',
+    name: 'Arrows',
+    keys: { up: 'ArrowUp', left: 'ArrowLeft', down: 'ArrowDown', right: 'ArrowRight', attack: 'Slash', action: 'Period' },
+    label: 'Arrows · / punch · . dash',
+  },
+  {
+    id: 'numpad',
+    name: 'Numpad',
+    keys: { up: 'Numpad8', left: 'Numpad4', down: 'Numpad5', right: 'Numpad6', attack: 'Numpad0', action: 'NumpadDecimal' },
+    label: 'Numpad 8456 · 0 punch · . dash',
+  },
+];
+
+class Button {
+  constructor() {
+    this.down = false;
+    this.pressed = false;      // went down this frame
+    this.released = false;     // went up this frame
+    this.heldTime = 0;         // how long it has been down
+    this.releaseHold = 0;      // how long it was down when released
+  }
+
+  update(down, dt) {
+    this.pressed = down && !this.down;
+    this.released = !down && this.down;
+    if (this.released) this.releaseHold = this.heldTime;
+    this.down = down;
+    this.heldTime = down ? this.heldTime + dt : 0;
+  }
+
+  reset() {
+    this.down = this.pressed = this.released = false;
+    this.heldTime = this.releaseHold = 0;
+  }
+}
+
+class Controller {
+  constructor(label = '') {
+    this.label = label;
+    this.ax = 0;
+    this.ay = 0;
+    this.attack = new Button();
+    this.action = new Button();
+    this.connected = true;
+  }
+
+  /** Magnitude of the movement stick, clamped to 1. */
+  get moveMag() {
+    return Math.min(1, Math.hypot(this.ax, this.ay));
+  }
+
+  reset() {
+    this.ax = this.ay = 0;
+    this.attack.reset();
+    this.action.reset();
+  }
+}
+
+/** A controller written to by the AI rather than by hardware. */
+class VirtualController extends Controller {
+  constructor(label = 'CPU') {
+    super(label);
+    this.want = { ax: 0, ay: 0, attack: false, action: false };
+  }
+
+  update(dt) {
+    this.ax = this.want.ax;
+    this.ay = this.want.ay;
+    this.attack.update(this.want.attack, dt);
+    this.action.update(this.want.action, dt);
+  }
+}
+
+class InputHub {
+  constructor(target = window) {
+    this.keys = new Set();
+    this.justPressed = new Set();
+    this.controllers = [];
+    this.anyKeySignal = false;
+
+    this._onDown = (e) => {
+      // Stop the page scrolling / activating when playing.
+      if (SWALLOW.has(e.code)) e.preventDefault();
+      if (!this.keys.has(e.code)) this.justPressed.add(e.code);
+      this.keys.add(e.code);
+      this.anyKeySignal = true;
+    };
+    this._onUp = (e) => this.keys.delete(e.code);
+    this._onBlur = () => {
+      this.keys.clear();
+      for (const c of this.controllers) c.reset();
+    };
+
+    target.addEventListener('keydown', this._onDown, { passive: false });
+    target.addEventListener('keyup', this._onUp);
+    target.addEventListener('blur', this._onBlur);
+  }
+
+  dispose(target = window) {
+    target.removeEventListener('keydown', this._onDown);
+    target.removeEventListener('keyup', this._onUp);
+    target.removeEventListener('blur', this._onBlur);
+  }
+
+  isDown(code) { return this.keys.has(code); }
+  wasPressed(code) { return this.justPressed.has(code); }
+
+  /** Creates (or reuses) a keyboard-backed controller for a scheme id. */
+  keyboardController(schemeId) {
+    const scheme = KEY_SCHEMES.find((s) => s.id === schemeId) || KEY_SCHEMES[0];
+    const c = new Controller(scheme.label);
+    c.kind = 'keyboard';
+    c.scheme = scheme;
+    c._read = (dt) => {
+      const k = scheme.keys;
+      c.ax = (this.isDown(k.right) ? 1 : 0) - (this.isDown(k.left) ? 1 : 0);
+      c.ay = (this.isDown(k.down) ? 1 : 0) - (this.isDown(k.up) ? 1 : 0);
+      // Latch: a key tapped and released between two frames would otherwise be
+      // polled as "never down" and the jab would silently vanish.
+      const held = (code) => this.isDown(code) || this.justPressed.has(code);
+      c.attack.update(held(k.attack), dt);
+      c.action.update(held(k.action), dt);
+    };
+    this.controllers.push(c);
+    return c;
+  }
+
+  /** Gamepad-backed controller. `index` is the navigator.getGamepads() slot. */
+  padController(index) {
+    const c = new Controller(`Gamepad ${index + 1} · A punch · B dash`);
+    c.kind = 'gamepad';
+    c.padIndex = index;
+    c._read = (dt) => {
+      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      const pad = pads && pads[index];
+      if (!pad) {
+        c.connected = false;
+        c.ax = c.ay = 0;
+        c.attack.update(false, dt);
+        c.action.update(false, dt);
+        return;
+      }
+      c.connected = true;
+      const dz = (v) => (Math.abs(v) < 0.22 ? 0 : v);
+      let ax = dz(pad.axes[0] || 0);
+      let ay = dz(pad.axes[1] || 0);
+      // D-pad fallback (standard mapping buttons 12..15).
+      if (pad.buttons.length > 15) {
+        if (pad.buttons[15].pressed) ax = 1;
+        if (pad.buttons[14].pressed) ax = -1;
+        if (pad.buttons[13].pressed) ay = 1;
+        if (pad.buttons[12].pressed) ay = -1;
+      }
+      c.ax = clamp(ax, -1, 1);
+      c.ay = clamp(ay, -1, 1);
+      const btn = (i) => !!(pad.buttons[i] && pad.buttons[i].pressed);
+      c.attack.update(btn(0) || btn(2) || btn(7), dt);
+      c.action.update(btn(1) || btn(3) || btn(6) || btn(5), dt);
+    };
+    this.controllers.push(c);
+    return c;
+  }
+
+  virtual(label) {
+    const c = new VirtualController(label);
+    c.kind = 'cpu';
+    c._read = (dt) => c.update(dt);
+    this.controllers.push(c);
+    return c;
+  }
+
+  clearControllers() {
+    this.controllers.length = 0;
+  }
+
+  update(dt) {
+    for (const c of this.controllers) c._read(dt);
+  }
+
+  /** Called at the very end of a frame. */
+  endFrame() {
+    this.justPressed.clear();
+    this.anyKeySignal = false;
+  }
+
+  static connectedPads() {
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    const out = [];
+    for (let i = 0; i < pads.length; i++) if (pads[i]) out.push(i);
+    return out;
+  }
+}
+
+const SWALLOW = new Set([
+  'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+  'Slash', 'Period', 'Numpad0', 'NumpadDecimal', 'Tab',
+]);
+
+__exports.__set({ KEY_SCHEMES, Controller, VirtualController, InputHub });
+
+};
+
+__defs["src/core/math.js"] = function (__exports, __require) {
+/** Small maths helpers shared by every system. All angles are radians. */
+
+const TAU = Math.PI * 2;
+
+const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+const lerp = (a, b, t) => a + (b - a) * t;
+const invLerp = (a, b, v) => (b === a ? 0 : (v - a) / (b - a));
+const sign = (v) => (v < 0 ? -1 : v > 0 ? 1 : 0);
+
+/** Frame-rate independent exponential smoothing. */
+const damp = (a, b, rate, dt) => lerp(a, b, 1 - Math.exp(-rate * dt));
+
+const dist2 = (ax, ay, bx, by) => {
+  const dx = bx - ax;
+  const dy = by - ay;
+  return dx * dx + dy * dy;
+};
+const dist = (ax, ay, bx, by) => Math.sqrt(dist2(ax, ay, bx, by));
+
+const len = (x, y) => Math.sqrt(x * x + y * y);
+
+/** Shortest signed delta between two angles. */
+function angleDelta(from, to) {
+  let d = (to - from) % TAU;
+  if (d > Math.PI) d -= TAU;
+  if (d < -Math.PI) d += TAU;
+  return d;
+}
+
+function rotateToward(from, to, maxStep) {
+  const d = angleDelta(from, to);
+  return from + clamp(d, -maxStep, maxStep);
+}
+
+function normalize(x, y) {
+  const l = Math.hypot(x, y);
+  return l > 1e-6 ? [x / l, y / l] : [0, 0];
+}
+
+/** Deterministic PRNG (mulberry32) so matches can be replayed from a seed. */
+function makeRng(seed = 1) {
+  let a = seed >>> 0;
+  const rng = () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  rng.range = (lo, hi) => lo + rng() * (hi - lo);
+  rng.int = (lo, hi) => Math.floor(rng.range(lo, hi + 1));
+  rng.pick = (arr) => arr[Math.floor(rng() * arr.length)];
+  rng.chance = (p) => rng() < p;
+  rng.angle = () => rng() * TAU;
+  return rng;
+}
+
+/** Easing used by the juice layer. */
+const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+const easeOutBack = (t) => 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2);
+const easeInQuad = (t) => t * t;
+
+/** Circle vs circle overlap resolution: returns the push vector for `a`. */
+function circlePush(ax, ay, ar, bx, by, br) {
+  const dx = ax - bx;
+  const dy = ay - by;
+  const r = ar + br;
+  const d2 = dx * dx + dy * dy;
+  if (d2 >= r * r || d2 < 1e-9) return null;
+  const d = Math.sqrt(d2);
+  const overlap = r - d;
+  return [(dx / d) * overlap, (dy / d) * overlap];
+}
+
+/** Segment/circle intersection test used by the navigation line-of-sight check. */
+function segmentHitsCircle(x1, y1, x2, y2, cx, cy, r) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const fx = x1 - cx;
+  const fy = y1 - cy;
+  const a = dx * dx + dy * dy;
+  if (a < 1e-9) return fx * fx + fy * fy <= r * r;
+  const b = 2 * (fx * dx + fy * dy);
+  const c = fx * fx + fy * fy - r * r;
+  const disc = b * b - 4 * a * c;
+  if (disc < 0) return false;
+  const sq = Math.sqrt(disc);
+  const t1 = (-b - sq) / (2 * a);
+  const t2 = (-b + sq) / (2 * a);
+  return (t1 >= 0 && t1 <= 1) || (t2 >= 0 && t2 <= 1) || (t1 < 0 && t2 > 1);
+}
+
+__exports.__set({ TAU, clamp, lerp, invLerp, sign, damp, dist2, dist, len, angleDelta, rotateToward, normalize, makeRng, easeOutCubic, easeOutBack, easeInQuad, circlePush, segmentHitsCircle });
+
+};
+
+__defs["src/core/audio.js"] = function (__exports, __require) {
+/**
+ * Tiny WebAudio synth. Every sound is generated from oscillators and noise
+ * buffers so the whole game stays a single dependency-free file.
+ */
+
+class Sfx {
+  constructor() {
+    this.ctx = null;
+    this.master = null;
+    this.enabled = true;
+    this.volume = 0.55;
+    this._noise = null;
+    this._chargeVoice = null;
+  }
+
+  /** Must be called from a user gesture (browsers block audio otherwise). */
+  unlock() {
+    if (this.ctx) {
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+      return;
+    }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) { this.enabled = false; return; }
+    this.ctx = new AC();
+    this.master = this.ctx.createGain();
+    this.master.gain.value = this.volume;
+    this.master.connect(this.ctx.destination);
+
+    const len = Math.floor(this.ctx.sampleRate * 0.6);
+    const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    this._noise = buf;
+  }
+
+  setVolume(v) {
+    this.volume = v;
+    if (this.master) this.master.gain.value = v;
+  }
+
+  toggle() {
+    this.enabled = !this.enabled;
+    if (this.master) this.master.gain.value = this.enabled ? this.volume : 0;
+    return this.enabled;
+  }
+
+  get t() { return this.ctx ? this.ctx.currentTime : 0; }
+
+  _tone({ freq = 440, to = null, type = 'sine', dur = 0.16, gain = 0.3, delay = 0, attack = 0.005 }) {
+    if (!this.ctx || !this.enabled) return;
+    const t0 = this.t + delay;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    if (to !== null) osc.frequency.exponentialRampToValueAtTime(Math.max(20, to), t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(gain, t0 + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(g).connect(this.master);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.05);
+  }
+
+  _noiseBurst({ dur = 0.15, gain = 0.3, freq = 900, q = 1.2, delay = 0, type = 'lowpass' }) {
+    if (!this.ctx || !this.enabled || !this._noise) return;
+    const t0 = this.t + delay;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this._noise;
+    const filt = this.ctx.createBiquadFilter();
+    filt.type = type;
+    filt.frequency.setValueAtTime(freq, t0);
+    filt.Q.value = q;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(gain, t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    src.connect(filt).connect(g).connect(this.master);
+    src.start(t0);
+    src.stop(t0 + dur + 0.02);
+  }
+
+  punch(power = 0) {
+    this._noiseBurst({ dur: 0.1 + power * 0.14, gain: 0.32 + power * 0.3, freq: 700 + power * 500, q: 0.9 });
+    this._tone({ freq: 190 - power * 50, to: 55, type: 'square', dur: 0.13 + power * 0.14, gain: 0.22 + power * 0.2 });
+    if (power > 0.55) this._tone({ freq: 90, to: 40, type: 'sawtooth', dur: 0.25, gain: 0.18, delay: 0.01 });
+  }
+
+  whiff() {
+    this._noiseBurst({ dur: 0.11, gain: 0.1, freq: 2200, q: 0.6, type: 'bandpass' });
+  }
+
+  /** Rising whine while a charged punch builds. */
+  charge(power) {
+    if (!this.ctx || !this.enabled) return;
+    if (!this._chargeVoice) {
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      osc.type = 'triangle';
+      g.gain.value = 0.0001;
+      osc.connect(g).connect(this.master);
+      osc.start();
+      this._chargeVoice = { osc, g };
+    }
+    const { osc, g } = this._chargeVoice;
+    const t = this.t;
+    osc.frequency.setTargetAtTime(180 + power * 620, t, 0.03);
+    g.gain.setTargetAtTime(0.03 + power * 0.09, t, 0.03);
+  }
+
+  chargeStop() {
+    if (!this._chargeVoice) return;
+    this._chargeVoice.g.gain.setTargetAtTime(0.0001, this.t, 0.02);
+  }
+
+  coin(pitch = 0) {
+    this._tone({ freq: 900 + pitch * 120, type: 'square', dur: 0.05, gain: 0.09 });
+    this._tone({ freq: 1500 + pitch * 160, type: 'square', dur: 0.07, gain: 0.07, delay: 0.03 });
+  }
+
+  deposit() {
+    this._tone({ freq: 520, type: 'triangle', dur: 0.1, gain: 0.16 });
+    this._tone({ freq: 780, type: 'triangle', dur: 0.12, gain: 0.14, delay: 0.06 });
+    this._tone({ freq: 1040, type: 'triangle', dur: 0.16, gain: 0.12, delay: 0.12 });
+  }
+
+  buy() {
+    [660, 880, 1320].forEach((f, i) =>
+      this._tone({ freq: f, type: 'square', dur: 0.12, gain: 0.12, delay: i * 0.055 }));
+  }
+
+  deny() {
+    this._tone({ freq: 160, to: 90, type: 'sawtooth', dur: 0.16, gain: 0.14 });
+  }
+
+  steal() {
+    this._tone({ freq: 300, to: 1200, type: 'sawtooth', dur: 0.28, gain: 0.16 });
+    this._noiseBurst({ dur: 0.3, gain: 0.14, freq: 1800, q: 3, type: 'bandpass' });
+  }
+
+  alarm() {
+    for (let i = 0; i < 3; i++) {
+      this._tone({ freq: 880, to: 620, type: 'square', dur: 0.13, gain: 0.12, delay: i * 0.16 });
+    }
+  }
+
+  dash() {
+    this._noiseBurst({ dur: 0.16, gain: 0.14, freq: 1400, q: 1.4, type: 'bandpass' });
+  }
+
+  pop() {
+    this._tone({ freq: 420, to: 900, type: 'sine', dur: 0.09, gain: 0.09 });
+  }
+
+  beep(high = false) {
+    this._tone({ freq: high ? 900 : 520, type: 'square', dur: high ? 0.35 : 0.16, gain: 0.18 });
+  }
+
+  fanfare() {
+    [523, 659, 784, 1046].forEach((f, i) =>
+      this._tone({ freq: f, type: 'triangle', dur: 0.4, gain: 0.16, delay: i * 0.12 }));
+  }
+
+  rush() {
+    this._tone({ freq: 220, to: 660, type: 'sawtooth', dur: 0.5, gain: 0.14 });
+    this._noiseBurst({ dur: 0.5, gain: 0.1, freq: 900, q: 0.7 });
+  }
+}
+
+const sfx = new Sfx();
+
+__exports.__set({ Sfx, sfx });
+
+};
+
+__defs["src/game/render.js"] = function (__exports, __require) {
+/**
+ * Canvas renderer. Everything is drawn as vectors — no image assets — so the
+ * whole game ships as one file.
+ *
+ * The camera fits the whole octagonal arena on screen and applies the shake /
+ * zoom-kick coming out of the Fx layer.
+ */
+
+const { ARENA, COLORS, SHOP, MATCH } = __require("src/config.js");
+const { clamp, lerp, TAU, easeOutCubic } = __require("src/core/math.js");
+const { ringAlpha } = __require("src/core/fx.js");
+const { shopRows } = __require("src/game/items.js");
+
+class Renderer {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.dpr = 1;
+    this.w = 0;
+    this.h = 0;
+    this.scale = 10;
+    this.resize();
+  }
+
+  resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = this.canvas.clientWidth || window.innerWidth;
+    const h = this.canvas.clientHeight || window.innerHeight;
+    this.canvas.width = Math.floor(w * dpr);
+    this.canvas.height = Math.floor(h * dpr);
+    this.dpr = dpr;
+    this.w = w;
+    this.h = h;
+  }
+
+  /** metres -> pixels for the current viewport. */
+  fit(margin = 1.06) {
+    const span = ARENA.half * 2 * margin;
+    return Math.min(this.w / span, (this.h - 96) / span);
+  }
+
+  draw(world, ui) {
+    const ctx = this.ctx;
+    const fx = world.fx;
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.clearRect(0, 0, this.w, this.h);
+
+    // Background
+    const bg = ctx.createLinearGradient(0, 0, 0, this.h);
+    bg.addColorStop(0, '#0d101a');
+    bg.addColorStop(1, '#080a11');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, this.w, this.h);
+
+    const zoom = 1 + fx.zoomKick * 0.02;
+    const s = this.fit() * zoom;
+    this.scale = s;
+    const cx = this.w / 2 + fx.shakeX * s * 0.16;
+    const cy = this.h / 2 + 26 + fx.shakeY * s * 0.16;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(fx.shakeRot);
+    ctx.scale(s, s);
+
+    this._drawFloor(ctx, world);
+    this._drawCamps(ctx, world);
+    this._drawShops(ctx, world);
+    this._drawRocks(ctx, world);
+    this._drawPoppers(ctx, world);
+    this._drawPickups(ctx, world);
+    this._drawRings(ctx, fx, false);
+    this._drawPlayers(ctx, world, ui);
+    this._drawParticles(ctx, fx);
+    this._drawRings(ctx, fx, true);
+    this._drawTexts(ctx, fx);
+
+    ctx.restore();
+
+    if (fx.flash > 0.001) {
+      ctx.fillStyle = `rgba(255,255,255,${fx.flash * 0.75})`;
+      ctx.fillRect(0, 0, this.w, this.h);
+    }
+    if (world.rushing && world.state === 'playing') {
+      const pulse = 0.06 + Math.abs(Math.sin(fx.time * 4)) * 0.07;
+      ctx.fillStyle = `rgba(255,120,40,${pulse})`;
+      ctx.fillRect(0, 0, this.w, this.h);
+    }
+  }
+
+  /* ------------------------------------------------------------ scenery */
+
+  _arenaPath(ctx, inset = 0) {
+    const h = ARENA.half - inset;
+    const c = ARENA.cornerCut;
+    ctx.beginPath();
+    ctx.moveTo(-h + c, -h);
+    ctx.lineTo(h - c, -h);
+    ctx.lineTo(h, -h + c);
+    ctx.lineTo(h, h - c);
+    ctx.lineTo(h - c, h);
+    ctx.lineTo(-h + c, h);
+    ctx.lineTo(-h, h - c);
+    ctx.lineTo(-h, -h + c);
+    ctx.closePath();
+  }
+
+  _drawFloor(ctx, world) {
+    ctx.save();
+    this._arenaPath(ctx, 0);
+    ctx.fillStyle = COLORS.floor;
+    ctx.fill();
+    ctx.clip();
+
+    // Radial vignette toward the motherlode.
+    const g = ctx.createRadialGradient(0, 0, 2, 0, 0, ARENA.half * 1.1);
+    g.addColorStop(0, 'rgba(60,52,26,0.55)');
+    g.addColorStop(0.35, 'rgba(30,34,50,0.25)');
+    g.addColorStop(1, 'rgba(8,10,16,0.65)');
+    ctx.fillStyle = g;
+    ctx.fillRect(-ARENA.half, -ARENA.half, ARENA.half * 2, ARENA.half * 2);
+
+    // Grid
+    ctx.strokeStyle = COLORS.grid;
+    ctx.lineWidth = 0.06;
+    ctx.globalAlpha = 0.55;
+    ctx.beginPath();
+    for (let i = -ARENA.half; i <= ARENA.half; i += 5) {
+      ctx.moveTo(i, -ARENA.half); ctx.lineTo(i, ARENA.half);
+      ctx.moveTo(-ARENA.half, i); ctx.lineTo(ARENA.half, i);
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // 25m ring the camps sit on.
+    ctx.strokeStyle = 'rgba(255,201,57,0.10)';
+    ctx.lineWidth = 0.14;
+    ctx.setLineDash([1.1, 1.1]);
+    ctx.beginPath();
+    ctx.arc(0, 0, ARENA.campRadius, 0, TAU);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // Wall
+    this._arenaPath(ctx, 0);
+    ctx.strokeStyle = COLORS.wall;
+    ctx.lineWidth = 0.7;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(120,140,190,0.25)';
+    ctx.lineWidth = 0.14;
+    ctx.stroke();
+  }
+
+  _drawRocks(ctx, world) {
+    for (const r of world.rocks) {
+      ctx.save();
+      ctx.translate(r.x, r.y);
+      ctx.beginPath();
+      ctx.moveTo(r.points[0][0], r.points[0][1] + 0.25);
+      for (const [px, py] of r.points) ctx.lineTo(px, py + 0.25);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(r.points[0][0], r.points[0][1]);
+      for (const [px, py] of r.points) ctx.lineTo(px, py);
+      ctx.closePath();
+      const g = ctx.createLinearGradient(0, -r.radius, 0, r.radius);
+      g.addColorStop(0, '#3a4158');
+      g.addColorStop(1, '#222839');
+      ctx.fillStyle = g;
+      ctx.fill();
+      ctx.strokeStyle = '#4a5470';
+      ctx.lineWidth = 0.1;
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  _drawCamps(ctx, world) {
+    for (const camp of world.camps) {
+      const p = world.players[camp.owner];
+      ctx.save();
+      ctx.translate(camp.x + camp.shakeX, camp.y + camp.shakeY);
+
+      // Ground disc
+      ctx.beginPath();
+      ctx.arc(0, 0, camp.radius, 0, TAU);
+      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      ctx.fill();
+      const g = ctx.createRadialGradient(0, 0, 0.5, 0, 0, camp.radius);
+      g.addColorStop(0, this._alpha(camp.color, 0.32 + camp.depositGlow * 0.3));
+      g.addColorStop(1, this._alpha(camp.color, 0.06));
+      ctx.fillStyle = g;
+      ctx.fill();
+
+      // Rim
+      ctx.beginPath();
+      ctx.arc(0, 0, camp.radius, 0, TAU);
+      ctx.strokeStyle = this._alpha(camp.color, 0.85);
+      ctx.lineWidth = 0.16 + camp.depositGlow * 0.12;
+      ctx.stroke();
+
+      // Alarm ring when raided / raidable
+      if (camp.alarm > 0) {
+        const a = (Math.sin(camp.pulse * 6) * 0.5 + 0.5) * camp.alarm;
+        ctx.beginPath();
+        ctx.arc(0, 0, camp.radius + 0.35, 0, TAU);
+        ctx.strokeStyle = `rgba(255,80,80,${a * 0.9})`;
+        ctx.lineWidth = 0.24;
+        ctx.stroke();
+      }
+
+      // Vault: a stack of coins whose height tracks the hoard.
+      const stack = clamp(camp.vault / 320, 0, 1);
+      const layers = Math.max(1, Math.round(stack * 9));
+      for (let i = 0; i < layers; i++) {
+        const y = -i * 0.17;
+        const w = lerp(1.55, 0.55, i / Math.max(1, layers - 1)) * (0.75 + stack * 0.45);
+        ctx.beginPath();
+        ctx.ellipse(0, y, w, w * 0.42, 0, 0, TAU);
+        ctx.fillStyle = i === layers - 1 ? COLORS.gold : (i % 2 ? '#e0ac25' : COLORS.gold);
+        ctx.fill();
+        ctx.strokeStyle = COLORS.goldDark;
+        ctx.lineWidth = 0.045;
+        ctx.stroke();
+      }
+      if (camp.flash > 0) {
+        ctx.beginPath();
+        ctx.arc(0, 0, camp.radius, 0, TAU);
+        ctx.fillStyle = `rgba(255,255,255,${camp.flash * 0.35})`;
+        ctx.fill();
+      }
+
+      // Banner: owner + vault. The name is dropped while the owner is standing
+      // here, since their own nameplate is already saying the same thing.
+      const ownerHome = Math.hypot(p.x - camp.x, p.y - camp.y) < camp.radius + 1;
+      ctx.save();
+      ctx.scale(0.1, 0.1);
+      if (!ownerHome) {
+        this._label(ctx, `${p.name}`, 0, -camp.radius * 10 - 16, {
+          size: 13, color: camp.color, weight: 800,
+        });
+      }
+      this._label(ctx, `${Math.floor(camp.vault)}g`, 0, -camp.radius * 10 - 2, {
+        size: 17, color: COLORS.gold, weight: 900,
+      });
+      ctx.restore();
+
+      // Flag pole
+      ctx.beginPath();
+      ctx.moveTo(camp.radius * 0.72, 0.2);
+      ctx.lineTo(camp.radius * 0.72, -2.6);
+      ctx.strokeStyle = '#8b93ad';
+      ctx.lineWidth = 0.12;
+      ctx.stroke();
+      const wave = Math.sin(camp.pulse * 2) * 0.18;
+      ctx.beginPath();
+      ctx.moveTo(camp.radius * 0.72, -2.6);
+      ctx.quadraticCurveTo(camp.radius * 0.72 + 0.7, -2.35 + wave, camp.radius * 0.72 + 1.4, -2.6 + wave);
+      ctx.lineTo(camp.radius * 0.72 + 1.4, -1.7 + wave);
+      ctx.quadraticCurveTo(camp.radius * 0.72 + 0.7, -1.45 + wave, camp.radius * 0.72, -1.7);
+      ctx.closePath();
+      ctx.fillStyle = camp.color;
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  _drawShops(ctx, world) {
+    for (const shop of world.shops) {
+      ctx.save();
+      ctx.translate(shop.x, shop.y);
+      const bob = Math.sin(shop.bob) * 0.12;
+
+      ctx.beginPath();
+      ctx.arc(0, 0, SHOP.browseRange, 0, TAU);
+      ctx.fillStyle = 'rgba(90,200,255,0.05)';
+      ctx.fill();
+      ctx.strokeStyle = `rgba(120,215,255,${0.22 + shop.flash * 0.5})`;
+      ctx.lineWidth = 0.1;
+      ctx.setLineDash([0.6, 0.5]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.beginPath();
+      ctx.ellipse(0, 0.4, shop.radius * 0.95, shop.radius * 0.4, 0, 0, TAU);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fill();
+
+      ctx.translate(0, bob);
+      // Counter
+      ctx.beginPath();
+      ctx.roundRect(-shop.radius * 0.85, -0.7, shop.radius * 1.7, 1.5, 0.25);
+      ctx.fillStyle = '#3b2f52';
+      ctx.fill();
+      ctx.strokeStyle = '#6f5fa0';
+      ctx.lineWidth = 0.1;
+      ctx.stroke();
+      // Awning
+      const stripes = 6;
+      for (let i = 0; i < stripes; i++) {
+        ctx.beginPath();
+        const x0 = -shop.radius + (i * 2 * shop.radius) / stripes;
+        ctx.rect(x0, -2.2, (2 * shop.radius) / stripes, 1.1);
+        ctx.fillStyle = i % 2 ? '#ff6f91' : '#ffe6ee';
+        ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.moveTo(-shop.radius, -2.2);
+      ctx.lineTo(shop.radius, -2.2);
+      ctx.lineTo(shop.radius * 0.78, -3.0);
+      ctx.lineTo(-shop.radius * 0.78, -3.0);
+      ctx.closePath();
+      ctx.fillStyle = '#54406f';
+      ctx.fill();
+
+      ctx.save();
+      ctx.scale(0.1, 0.1);
+      this._label(ctx, 'SHOP', 0, -32, { size: 13, color: '#ffe6ee', weight: 900 });
+      ctx.restore();
+      ctx.restore();
+    }
+  }
+
+  _drawPoppers(ctx, world) {
+    for (const pop of world.poppers) {
+      const big = pop.kind === 'big';
+      ctx.save();
+      ctx.translate(pop.x + pop.shakeX, pop.y + pop.shakeY);
+
+      // Harvest ring
+      ctx.beginPath();
+      ctx.arc(0, 0, pop.reach, 0, TAU);
+      ctx.fillStyle = `rgba(255,201,57,${0.04 + pop.shake * 0.05})`;
+      ctx.fill();
+      ctx.strokeStyle = `rgba(255,201,57,${0.18 + pop.shake * 0.35})`;
+      ctx.lineWidth = 0.09;
+      ctx.setLineDash([0.5, 0.45]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Shadow
+      ctx.beginPath();
+      ctx.ellipse(0, pop.radius * 0.55, pop.radius * 1.0, pop.radius * 0.38, 0, 0, TAU);
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fill();
+
+      const wob = 1 + Math.sin(pop.bob) * 0.02 + pop.shake * 0.06;
+      ctx.rotate(Math.sin(pop.shakePhase * 1.7) * pop.shake * 0.07);
+      ctx.scale(wob, 2 - wob);
+
+      // Body
+      const r = pop.radius;
+      ctx.beginPath();
+      ctx.roundRect(-r * 0.8, -r * 1.15, r * 1.6, r * 1.75, r * 0.3);
+      const bodyG = ctx.createLinearGradient(0, -r, 0, r);
+      bodyG.addColorStop(0, big ? '#4b3f6e' : '#3d3559');
+      bodyG.addColorStop(1, '#241f36');
+      ctx.fillStyle = bodyG;
+      ctx.fill();
+      ctx.strokeStyle = big ? '#8a76c9' : '#6b5da3';
+      ctx.lineWidth = 0.12;
+      ctx.stroke();
+
+      // Glass dome full of coins
+      ctx.beginPath();
+      ctx.arc(0, -r * 0.95, r * 0.72, Math.PI, TAU);
+      ctx.fillStyle = 'rgba(180,220,255,0.16)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(190,225,255,0.4)';
+      ctx.lineWidth = 0.08;
+      ctx.stroke();
+
+      const fill = clamp(pop.gold / pop.cap, 0, 1);
+      const coinRows = Math.max(1, Math.round(fill * 5));
+      for (let i = 0; i < coinRows; i++) {
+        const y = -r * 0.6 - i * r * 0.18;
+        const w = r * (0.62 - i * 0.07);
+        ctx.beginPath();
+        ctx.ellipse(Math.sin(pop.shakePhase + i) * pop.shake * 0.12, y, w, w * 0.4, 0, 0, TAU);
+        ctx.fillStyle = i % 2 ? '#e0ac25' : COLORS.gold;
+        ctx.fill();
+      }
+
+      // Spout
+      ctx.beginPath();
+      ctx.roundRect(-r * 0.34, r * 0.1, r * 0.68, r * 0.42, 0.08);
+      ctx.fillStyle = '#141826';
+      ctx.fill();
+
+      // Rotating rate dial
+      ctx.save();
+      ctx.translate(0, -r * 0.05);
+      ctx.rotate(pop.spinPhase);
+      ctx.beginPath();
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * TAU;
+        ctx.moveTo(0, 0);
+        ctx.lineTo(Math.cos(a) * r * 0.3, Math.sin(a) * r * 0.3);
+      }
+      ctx.strokeStyle = `rgba(255,201,57,${0.35 + pop.shake * 0.5})`;
+      ctx.lineWidth = 0.09;
+      ctx.stroke();
+      ctx.restore();
+      ctx.restore();
+
+      // Labels (unscaled by the wobble)
+      ctx.save();
+      ctx.translate(pop.x + pop.shakeX, pop.y + pop.shakeY);
+      ctx.scale(0.1, 0.1);
+      this._label(ctx, `${Math.floor(pop.gold)}g`, 0, (pop.radius + 1.5) * 10, {
+        size: big ? 19 : 15, color: COLORS.gold, weight: 900,
+      });
+      this._label(ctx, `+${Math.round(pop.rate * 60 * (world.rushing ? MATCH.rushPopperMultiplier : 1))}/min`,
+        0, (pop.radius + 2.6) * 10, { size: 10, color: 'rgba(255,225,150,0.7)', weight: 700 });
+      ctx.restore();
+    }
+  }
+
+  _drawPickups(ctx, world) {
+    for (const g of world.pickups) {
+      const a = g.fading ? 0.35 + Math.abs(Math.sin(g.bob * 3)) * 0.65 : 1;
+      const bob = Math.sin(g.bob) * 0.08;
+      ctx.save();
+      ctx.translate(g.x, g.y + bob);
+      ctx.globalAlpha = a;
+      ctx.beginPath();
+      ctx.ellipse(0, 0.28, 0.34, 0.13, 0, 0, TAU);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fill();
+      const sq = Math.abs(Math.cos(g.rot));
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 0.34 * (0.35 + sq * 0.65), 0.34, 0, 0, TAU);
+      ctx.fillStyle = COLORS.gold;
+      ctx.fill();
+      ctx.strokeStyle = COLORS.goldDark;
+      ctx.lineWidth = 0.06;
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  /* ------------------------------------------------------------- players */
+
+  _drawPlayers(ctx, world, ui) {
+    const order = [...world.players].sort((a, b) => a.y - b.y);
+    for (const p of order) {
+      if (!p.alive) continue;
+      const r = p.radius;
+      const sq = p.squash;
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+
+      // Shadow
+      ctx.beginPath();
+      ctx.ellipse(0, r * 0.75, r * 0.95, r * 0.38, 0, 0, TAU);
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fill();
+
+      // Charge aura
+      if (p.glow > 0.01) {
+        const gr = r * (1.6 + p.glow * 1.5);
+        const g = ctx.createRadialGradient(0, 0, r * 0.5, 0, 0, gr);
+        g.addColorStop(0, `rgba(255,240,180,${0.35 * p.glow})`);
+        g.addColorStop(1, 'rgba(255,220,120,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(0, 0, gr, 0, TAU);
+        ctx.fill();
+        if (p.chargeRatio >= 1) {
+          ctx.beginPath();
+          ctx.arc(0, 0, r * 1.5 + Math.sin(world.fx.time * 22) * 0.08, 0, TAU);
+          ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+          ctx.lineWidth = 0.09;
+          ctx.stroke();
+        }
+      }
+
+      // Punch arc telegraph
+      if (p.phase === 'active') {
+        const o = p.punchOrigin();
+        ctx.save();
+        ctx.rotate(p.facing);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, r + o.range * 0.8, -0.55, 0.55);
+        ctx.closePath();
+        ctx.fillStyle = `rgba(255,255,255,${0.18 + p.punchPower * 0.25})`;
+        ctx.fill();
+        ctx.restore();
+      }
+
+      ctx.save();
+      ctx.scale(1 / sq, sq);
+
+      // Body
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, TAU);
+      const bg = ctx.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.15, 0, 0, r);
+      bg.addColorStop(0, this._lighten(p.color, 0.35));
+      bg.addColorStop(1, p.color);
+      ctx.fillStyle = bg;
+      ctx.fill();
+      ctx.lineWidth = 0.12;
+      ctx.strokeStyle = p.colorDark;
+      ctx.stroke();
+
+      if (p.invuln > 0 && Math.floor(world.fx.time * 24) % 2 === 0) {
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, TAU);
+        ctx.fillStyle = 'rgba(255,255,255,0.28)';
+        ctx.fill();
+      }
+      if (p.hitFlash > 0) {
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, TAU);
+        ctx.fillStyle = `rgba(255,255,255,${p.hitFlash * 0.85})`;
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // Eyes look where you face; they cross when stunned.
+      ctx.save();
+      ctx.rotate(p.facing);
+      const eyeX = r * 0.34;
+      for (const sgn of [-1, 1]) {
+        ctx.beginPath();
+        ctx.ellipse(eyeX, sgn * r * 0.33, r * 0.2, r * 0.24, 0, 0, TAU);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.beginPath();
+        const stunned = p.stun > 0;
+        ctx.arc(eyeX + r * (stunned ? 0.04 : 0.09), sgn * r * 0.33 + (stunned ? sgn * r * 0.06 : 0), r * 0.1, 0, TAU);
+        ctx.fillStyle = '#101422';
+        ctx.fill();
+      }
+
+      // Fist
+      const punching = p.phase === 'active' || p.phase === 'windup';
+      const reachOut = p.phase === 'active' ? 1 : p.phase === 'windup' ? -0.35 : 0;
+      const fx0 = r * (0.75 + reachOut * (0.9 + p.punchPower * 0.7));
+      ctx.beginPath();
+      ctx.arc(fx0, 0, r * (0.3 + p.punchPower * 0.12), 0, TAU);
+      ctx.fillStyle = punching ? '#fff' : this._lighten(p.color, 0.18);
+      ctx.fill();
+      ctx.strokeStyle = p.colorDark;
+      ctx.lineWidth = 0.08;
+      ctx.stroke();
+      ctx.restore();
+
+      // Carried gold pouch
+      if (p.bag > 0) {
+        const t = p.bagFill;
+        ctx.save();
+        ctx.translate(-r * 0.15, -r * 1.25 - t * 0.25);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 0.34 + t * 0.3, 0.3 + t * 0.28, 0, 0, TAU);
+        ctx.fillStyle = '#6b4a1f';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(0, -0.06 - t * 0.05, 0.2 + t * 0.2, 0.13 + t * 0.12, 0, 0, TAU);
+        ctx.fillStyle = COLORS.gold;
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Thief marker
+      if (p.canSteal) {
+        ctx.save();
+        ctx.translate(r * 0.95, -r * 1.15);
+        ctx.rotate(Math.sin(world.fx.time * 3 + p.index) * 0.2);
+        ctx.beginPath();
+        ctx.moveTo(0, -0.28);
+        ctx.lineTo(0.26, 0.22);
+        ctx.lineTo(-0.26, 0.22);
+        ctx.closePath();
+        ctx.fillStyle = '#ff9d5d';
+        ctx.fill();
+        ctx.restore();
+      }
+
+      ctx.restore();
+
+      // Name + bag bar, drawn in screen-ish units
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.scale(0.1, 0.1);
+      const top = -(r + 1.15) * 10;
+      this._label(ctx, p.name, 0, top, { size: 11, color: p.color, weight: 800 });
+      const bw = 26, bh = 4.4;
+      ctx.beginPath();
+      ctx.roundRect(-bw / 2, top + 3, bw, bh, 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.roundRect(-bw / 2, top + 3, bw * p.bagFill, bh, 2);
+      ctx.fillStyle = p.bagFill > 0.95 ? '#fff0a8' : COLORS.gold;
+      ctx.fill();
+      if (p.bag > 0) {
+        this._label(ctx, `${Math.floor(p.bag)}`, 0, top + 15, { size: 10, color: '#ffe9a8', weight: 800 });
+      }
+      // Dash cooldown pip
+      if (p.dashCooldown > 0) {
+        ctx.beginPath();
+        ctx.arc(bw / 2 + 4, top + 5.2, 2.2, -Math.PI / 2, -Math.PI / 2 + TAU * (1 - p.dashCooldown / 2.4));
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      if (ui && ui.debugAI && p.brain) {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.scale(0.1, 0.1);
+        this._label(ctx, p.brain.debugLabel, 0, (r + 2.6) * 10, { size: 9, color: '#8fa', weight: 700 });
+        ctx.restore();
+        this._drawPath(ctx, p.brain.follow, p.color);
+      }
+    }
+
+    // Shop panels float above everything else in world space.
+    for (const p of world.players) if (p.shop) this._drawShopPanel(ctx, world, p);
+  }
+
+  _drawPath(ctx, follow, color) {
+    if (!follow.path) return;
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.beginPath();
+    for (let i = follow.index; i < follow.path.length; i++) {
+      const w = follow.path[i];
+      if (i === follow.index) ctx.moveTo(w.x, w.y); else ctx.lineTo(w.x, w.y);
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 0.08;
+    ctx.setLineDash([0.4, 0.3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  /* ---------------------------------------------------------- shop panel */
+
+  _drawShopPanel(ctx, world, p) {
+    const rows = shopRows(p);
+    const W = 17.5, rowH = 1.55;
+    const H = rows.length * rowH + 3.1;
+    // Open outward, into the empty margin beside the arena, so the panel never
+    // covers the centre of the fight.
+    let x = p.shop.x < 0 ? p.shop.x - W - 4.6 : p.shop.x + 4.6;
+    let y = p.shop.y - H / 2 + (p.index % 2 ? 0.6 : -0.6);
+    // Nudge the panel so two customers at one shop don't overlap.
+    if (p.shop.customers.size > 1) y += (p.index - 1.5) * 1.6;
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.beginPath();
+    ctx.roundRect(0, 0, W, H, 0.5);
+    ctx.fillStyle = 'rgba(12,15,24,0.92)';
+    ctx.fill();
+    ctx.strokeStyle = p.color;
+    ctx.lineWidth = 0.12;
+    ctx.stroke();
+
+    ctx.save();
+    ctx.scale(0.1, 0.1);
+    const vault = p.home ? Math.floor(p.home.vault) : 0;
+    this._label(ctx, `${p.name}  ·  ${Math.floor(p.bag)}g bag  +  ${vault}g vault`, W * 5, 16,
+      { size: 12, color: COLORS.gold, weight: 800 });
+    ctx.restore();
+
+    rows.forEach((row, i) => {
+      const ry = 2.2 + i * rowH;
+      const sel = i === p.shopIndex;
+      if (sel) {
+        ctx.beginPath();
+        ctx.roundRect(0.25, ry - 0.6, W - 0.5, rowH - 0.12, 0.3);
+        ctx.fillStyle = this._alpha(p.color, 0.22);
+        ctx.fill();
+        ctx.strokeStyle = this._alpha(p.color, 0.8);
+        ctx.lineWidth = 0.07;
+        ctx.stroke();
+        if (p.buyHold > 0) {
+          ctx.beginPath();
+          ctx.roundRect(0.25, ry - 0.6, (W - 0.5) * clamp(p.buyHold / 0.45, 0, 1), rowH - 0.12, 0.3);
+          ctx.fillStyle = this._alpha(COLORS.gold, 0.45);
+          ctx.fill();
+        }
+      }
+      ctx.save();
+      ctx.scale(0.1, 0.1);
+      const color = row.maxed ? '#6d7691' : row.affordable ? '#eaf0ff' : '#98a1bd';
+      this._label(ctx, row.def.name, 9, ry * 10 + 3.5, { size: 10.5, color, weight: 700, align: 'left' });
+      const lvl = row.def.max > 1 ? `${row.level}/${row.def.max}` : (row.level ? 'OWNED' : '');
+      this._label(ctx, lvl, W * 10 - 52, ry * 10 + 3.5, { size: 9, color: '#7f89a8', weight: 700, align: 'right' });
+      // Amber price = the vault has to chip in, which costs you final score.
+      const priceColor = row.maxed ? '#6d7691'
+        : !row.affordable ? '#b5603f'
+          : row.needsVault ? '#ffa552' : COLORS.gold;
+      this._label(ctx, row.maxed ? 'MAX' : `${row.price}g`, W * 10 - 8, ry * 10 + 3.5, {
+        size: 11, color: priceColor, weight: 800, align: 'right',
+      });
+      ctx.restore();
+    });
+
+    ctx.save();
+    ctx.scale(0.1, 0.1);
+    this._label(ctx, p.isHuman ? 'ACTION = next   ·   HOLD PUNCH = buy' : 'shopping…', W * 5, H * 10 - 5,
+      { size: 8.5, color: '#8b95b4', weight: 700 });
+    ctx.restore();
+    ctx.restore();
+  }
+
+  /* ------------------------------------------------------------------ fx */
+
+  _drawParticles(ctx, fx) {
+    for (const p of fx.particles) {
+      const t = p.life / p.maxLife;
+      ctx.globalAlpha = clamp(t * 1.4, 0, 1);
+      if (p.shape === 'coin') {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        const sq = Math.abs(Math.cos(p.rot));
+        ctx.beginPath();
+        ctx.ellipse(0, 0, p.r * (0.3 + sq * 0.7), p.r, 0, 0, TAU);
+        ctx.fillStyle = p.color;
+        ctx.fill();
+        ctx.restore();
+      } else {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * (0.4 + t * 0.6), 0, TAU);
+        ctx.fillStyle = p.color;
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  _drawRings(ctx, fx, above) {
+    for (const r of fx.rings) {
+      const t = 1 - r.life / r.maxLife;
+      const rad = lerp(r.r0, r.r1, easeOutCubic(t));
+      ctx.globalAlpha = ringAlpha(r) * (above ? 0.9 : 0.6);
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, rad, 0, TAU);
+      ctx.strokeStyle = r.color;
+      ctx.lineWidth = r.width * (1 - t * 0.6);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  _drawTexts(ctx, fx) {
+    for (const t of fx.texts) {
+      const k = t.life / t.maxLife;
+      ctx.save();
+      ctx.translate(t.x, t.y);
+      ctx.scale(0.1, 0.1);
+      ctx.globalAlpha = clamp(k * 1.6, 0, 1);
+      this._label(ctx, t.str, 0, 0, {
+        size: 13 * t.size * (1 + (1 - k) * 0.18), color: t.color, weight: 900, outline: t.outline,
+      });
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /* -------------------------------------------------------------- helpers */
+
+  _label(ctx, text, x, y, { size = 12, color = '#fff', weight = 700, align = 'center', outline = '#0b0d14' } = {}) {
+    ctx.font = `${weight} ${size}px "Trebuchet MS", "Segoe UI", system-ui, sans-serif`;
+    ctx.textAlign = align;
+    ctx.textBaseline = 'middle';
+    if (outline) {
+      ctx.lineWidth = Math.max(2, size * 0.28);
+      ctx.strokeStyle = outline;
+      ctx.lineJoin = 'round';
+      ctx.strokeText(text, x, y);
+    }
+    ctx.fillStyle = color;
+    ctx.fillText(text, x, y);
+  }
+
+  _alpha(hex, a) {
+    const { r, g, b } = hexToRgb(hex);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  _lighten(hex, amount) {
+    const { r, g, b } = hexToRgb(hex);
+    return `rgb(${Math.round(lerp(r, 255, amount))},${Math.round(lerp(g, 255, amount))},${Math.round(lerp(b, 255, amount))})`;
+  }
+}
+
+function hexToRgb(hex) {
+  const h = hex.replace('#', '');
+  const v = h.length === 3
+    ? h.split('').map((c) => parseInt(c + c, 16))
+    : [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  return { r: v[0], g: v[1], b: v[2] };
+}
+
+__exports.__set({ Renderer, hexToRgb });
+
+};
+
+__defs["src/config.js"] = function (__exports, __require) {
+/**
+ * Central tuning file. Every gameplay number lives here so balance passes never
+ * require touching simulation code.
+ *
+ * Units: metres (m), seconds (s), gold (g). The renderer converts m -> px.
+ */
+
+const MATCH = {
+  duration: 150,           // 2.5 minute match
+  countdown: 3,            // "3 - 2 - 1 - GO" before the clock starts
+  rushAt: 25,              // seconds remaining when the RUSH phase begins
+  rushPopperMultiplier: 2.5,
+  rushBurst: 60,           // one-off gold injected into the centre popper at rush
+};
+
+const ARENA = {
+  half: 35,                // arena spans -35m .. +35m on both axes
+  wallBounce: 0.25,
+  campRadius: 25,          // base camps sit 25m from the centre popper
+  cornerCut: 9,            // arena corners are chamfered by this much
+};
+
+const PLAYER = {
+  radius: 1.2,             // characters read clearly at whole-arena zoom
+  speed: 6.2,              // m/s at full tilt
+  accel: 46,               // m/s^2
+  friction: 12,
+  bagCapacity: 40,
+  turnRate: 14,            // rad/s for the facing indicator
+  stunTime: 0.42,
+  invulnAfterHit: 0.55,
+  knockbackDecay: 5.5,
+  dashSpeed: 15.5,
+  dashTime: 0.16,
+  dashCooldown: 2.4,
+  respawnGrace: 1.0,
+};
+
+const COMBAT = {
+  punchWindup: 0.06,
+  punchActive: 0.09,
+  punchRecover: 0.2,
+  punchCooldown: 0.28,
+  punchReach: 1.55,        // added to the player's radius
+  punchArc: Math.PI * 0.62,
+
+  chargeMinHold: 0.18,     // hold longer than this and the punch becomes charged
+  chargeFull: 1.15,        // hold time for maximum power
+  chargeMoveSlow: 0.42,    // movement multiplier while charging
+  chargeReachBonus: 0.9,   // extra reach at full charge
+  chargeCooldown: 0.5,
+
+  // Fraction of the victim's bag that a connecting punch rips loose.
+  lightSteal: 0.35,
+  chargedStealMin: 0.45,
+  chargedStealMax: 0.8,
+  attackerShare: 0.75,     // rest of the loot scatters on the floor
+  minSteal: 4,             // a punch on an almost-empty bag still shakes coins out
+
+  knockbackLight: 9.0,
+  knockbackChargedMin: 13,
+  knockbackChargedMax: 24,
+  stunChargedBonus: 0.3,
+
+  hitstopLight: 0.055,
+  hitstopChargedMin: 0.09,
+  hitstopChargedMax: 0.19,
+  shakeLight: 0.28,
+  shakeCharged: 0.75,
+};
+
+const POPPERS = {
+  big: {
+    id: 'big',
+    radius: 2.5,
+    start: 50,
+    ratePerMin: 200,
+    cap: 320,
+    harvestRate: 34,       // gold/s pulled into a bag while standing in range
+    reach: 3.9,
+  },
+  small: {
+    id: 'small',
+    radius: 1.7,
+    start: 20,
+    ratePerMin: 80,
+    cap: 160,
+    harvestRate: 26,
+    reach: 3.1,
+  },
+};
+
+const CAMP = {
+  radius: 3.2,
+  depositRate: 95,         // gold/s moved from bag to vault
+  stealCooldown: 4.5,      // per (thief, camp) pair
+  stealFraction: 0.25,     // of the vault
+  stealCap: 70,
+  stealMin: 10,
+};
+
+const SHOP = {
+  radius: 3.0,
+  browseRange: 4.6,
+  buyHold: 0.45,           // hold the action key this long to confirm a purchase
+  cycleCooldown: 0.12,
+};
+
+/**
+ * Shop catalogue. `cost(level)` is the price of the NEXT level.
+ *
+ * Purchases are paid out of the gold you are *carrying*, so the bag capacity
+ * is also the price ceiling: every tier-1 upgrade fits inside the starting 40g
+ * bag, while deeper levels and Steal only become reachable once Gold Bag Up
+ * has widened the wallet. That makes bag size the spine of the tech tree.
+ */
+const ITEMS = [
+  {
+    id: 'attackUp',
+    name: 'Attack Up',
+    blurb: 'Punches rip +22% more gold and hit harder.',
+    icon: 'fist',
+    max: 4,
+    cost: (lvl) => 28 + lvl * 24,      // 28 / 52 / 76 / 100
+  },
+  {
+    id: 'defenseUp',
+    name: 'Defense Up',
+    blurb: 'Lose 18% less gold per hit, shrug off knockback.',
+    icon: 'shield',
+    max: 4,
+    cost: (lvl) => 28 + lvl * 24,
+  },
+  {
+    id: 'goldBagUp',
+    name: 'Gold Bag Up',
+    blurb: '+25 carry capacity — and a bigger shopping budget.',
+    icon: 'bag',
+    max: 4,
+    cost: (lvl) => 30 + lvl * 26,      // 30 / 56 / 82 / 108
+  },
+  {
+    id: 'baseCampUp',
+    name: 'Base Camp Up',
+    blurb: 'Vault armour, faster deposits, +4% end bonus.',
+    icon: 'camp',
+    max: 3,
+    cost: (lvl) => 36 + lvl * 34,      // 36 / 70 / 104
+  },
+  {
+    id: 'scaleUp',
+    name: 'Scale Up',
+    blurb: 'Bigger: more reach, more knockback, slower.',
+    icon: 'up',
+    max: 3,
+    cost: () => 34,
+  },
+  {
+    id: 'scaleDown',
+    name: 'Scale Down',
+    blurb: 'Smaller: faster, harder to hit, weaker punch.',
+    icon: 'down',
+    max: 3,
+    cost: () => 34,
+  },
+  {
+    id: 'steal',
+    name: 'Steal',
+    blurb: 'Punch enemy base camps to rob their vault. Needs a bigger bag first.',
+    icon: 'steal',
+    max: 1,
+    cost: () => 52,
+  },
+];
+
+const UPGRADE = {
+  attackPerLevel: 0.22,
+  defensePerLevel: 0.18,
+  bagPerLevel: 25,
+  campArmorPerLevel: 0.3,
+  campDepositPerLevel: 0.35,
+  campEndBonusPerLevel: 0.04,
+  scaleStep: 0.16,          // size delta per scale level
+  scaleSpeedPerLevel: -0.1, // bigger = slower
+  scalePowerPerLevel: 0.18, // bigger = stronger
+  scaleReachPerLevel: 0.22,
+};
+
+const PICKUP = {
+  radius: 0.42,
+  magnetRange: 2.2,
+  magnetSpeed: 13,
+  life: 22,
+  scatterSpeed: [3.5, 8.5],
+  drag: 3.4,
+  clumpSize: 12,           // gold per dropped coin blob
+  autoPickupDelay: 0.35,
+};
+
+/** Personalities for the AI. Every "will" is 0..1 and blends into the utility scores. */
+const NPC_PROFILES = [
+  {
+    id: 'bruiser', name: 'Bruno', tag: 'Bruiser',
+    attackWill: 0.9, saveGoldWill: 0.42, stealWill: 0.45, shopWill: 0.55,
+    greed: 0.75, caution: 0.2,
+    shopBias: { attackUp: 1.6, scaleUp: 1.3, defenseUp: 0.7, goldBagUp: 0.5, baseCampUp: 0.3, steal: 1.1, scaleDown: 0.1 },
+  },
+  {
+    id: 'banker', name: 'Coinsworth', tag: 'Banker',
+    attackWill: 0.2, saveGoldWill: 0.92, stealWill: 0.15, shopWill: 0.7,
+    greed: 0.5, caution: 0.85,
+    shopBias: { goldBagUp: 1.7, baseCampUp: 1.5, defenseUp: 1.1, scaleDown: 0.8, attackUp: 0.3, scaleUp: 0.2, steal: 0.2 },
+  },
+  {
+    id: 'thief', name: 'Sly', tag: 'Thief',
+    attackWill: 0.55, saveGoldWill: 0.45, stealWill: 0.95, shopWill: 0.8,
+    greed: 0.9, caution: 0.5,
+    shopBias: { steal: 2.2, scaleDown: 1.2, attackUp: 0.9, goldBagUp: 0.7, defenseUp: 0.5, baseCampUp: 0.4, scaleUp: 0.2 },
+  },
+  {
+    id: 'allround', name: 'Pip', tag: 'All-round',
+    attackWill: 0.55, saveGoldWill: 0.6, stealWill: 0.5, shopWill: 0.6,
+    greed: 0.6, caution: 0.5,
+    shopBias: { attackUp: 1.0, defenseUp: 1.0, goldBagUp: 1.0, baseCampUp: 0.9, steal: 1.25, scaleUp: 0.6, scaleDown: 0.6 },
+  },
+];
+
+/** Difficulty knobs multiply on top of a profile. */
+const DIFFICULTY = {
+  easy:   { react: 0.42, aim: 0.62, chargeSkill: 0.35, speed: 0.9,  awareness: 16, label: 'Easy' },
+  normal: { react: 0.24, aim: 0.82, chargeSkill: 0.65, speed: 1.0,  awareness: 24, label: 'Normal' },
+  hard:   { react: 0.12, aim: 0.94, chargeSkill: 0.9,  speed: 1.05, awareness: 34, label: 'Hard' },
+};
+
+const COLORS = {
+  players: ['#ff5d5d', '#4ea6ff', '#ffd23f', '#5ce68b'],
+  playersDark: ['#8f2626', '#1c548f', '#8f6c11', '#227a44'],
+  gold: '#ffc939',
+  goldDark: '#a8760d',
+  floor: '#171b26',
+  floor2: '#1d2231',
+  grid: '#252c3d',
+  wall: '#2e3750',
+  ink: '#0b0d14',
+  text: '#e8ecf7',
+};
+
+const NAV = {
+  cell: 1.4,               // A* grid resolution in metres
+  agentClearance: 1.0,     // obstacles are inflated by this before pathing
+  repathInterval: 0.55,
+  waypointReach: 1.1,
+};
+
+__exports.__set({ MATCH, ARENA, PLAYER, COMBAT, POPPERS, CAMP, SHOP, ITEMS, UPGRADE, PICKUP, NPC_PROFILES, DIFFICULTY, COLORS, NAV });
+
+};
+
+__defs["src/core/fx.js"] = function (__exports, __require) {
+/**
+ * The "juice" layer: particles, floating numbers, shockwave rings, screen
+ * shake and hit-stop.
+ *
+ * Hit-stop works by freezing the simulation clock (`Fx.freeze`) while the
+ * presentation layer keeps running on real time, so impacts read as a sharp
+ * pause instead of a dropped frame.
+ */
+
+const { clamp, TAU, easeOutCubic, makeRng } = __require("src/core/math.js");
+
+const rng = makeRng(0xc0ffee);
+
+class Fx {
+  constructor() {
+    this.particles = [];
+    this.texts = [];
+    this.rings = [];
+    this.trauma = 0;         // 0..1, screen shake energy
+    this.freeze = 0;         // remaining hit-stop in real seconds
+    this.flash = 0;          // white flash intensity
+    this.shakeX = 0;
+    this.shakeY = 0;
+    this.shakeRot = 0;
+    this.time = 0;
+    this.zoomKick = 0;
+  }
+
+  clear() {
+    this.particles.length = 0;
+    this.texts.length = 0;
+    this.rings.length = 0;
+    this.trauma = this.freeze = this.flash = this.zoomKick = 0;
+  }
+
+  hitstop(seconds) {
+    this.freeze = Math.max(this.freeze, seconds);
+  }
+
+  shake(amount) {
+    this.trauma = clamp(this.trauma + amount, 0, 1);
+  }
+
+  kick(amount) {
+    this.zoomKick = Math.max(this.zoomKick, amount);
+  }
+
+  whiteFlash(a = 0.5) {
+    this.flash = Math.max(this.flash, a);
+  }
+
+  /**
+   * Cone / radial particle burst.
+   * `dir` + `spread` shape a cone; omit `dir` for a full circle.
+   */
+  burst(x, y, {
+    count = 10, color = '#fff', speed = [4, 12], life = [0.25, 0.5],
+    size = [0.08, 0.22], dir = null, spread = TAU, drag = 4.5, gravity = 0,
+    shape = 'dot', glow = false, spin = 0,
+  } = {}) {
+    for (let i = 0; i < count; i++) {
+      const a = dir === null ? rng.angle() : dir + rng.range(-spread / 2, spread / 2);
+      const s = rng.range(speed[0], speed[1]);
+      this.particles.push({
+        x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+        life: rng.range(life[0], life[1]), maxLife: 0, r: rng.range(size[0], size[1]),
+        color, drag, gravity, shape, glow,
+        rot: rng.angle(), spin: spin || rng.range(-9, 9),
+      });
+      const p = this.particles[this.particles.length - 1];
+      p.maxLife = p.life;
+    }
+  }
+
+  /** Expanding ring — used for punch impacts, deposits and popper pops. */
+  ring(x, y, { r0 = 0.4, r1 = 3, life = 0.32, color = '#fff', width = 0.28, fade = true } = {}) {
+    this.rings.push({ x, y, r0, r1, life, maxLife: life, color, width, fade });
+  }
+
+  /** Floating combat text. */
+  text(x, y, str, { color = '#fff', size = 1.0, life = 0.9, vy = -2.4, outline = '#0b0d14', bold = true } = {}) {
+    this.texts.push({ x, y, str, color, size, life, maxLife: life, vy, outline, bold });
+  }
+
+  /** Advance presentation-only state. Always fed *real* dt. */
+  update(dt) {
+    this.time += dt;
+
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const p = this.particles[i];
+      p.life -= dt;
+      if (p.life <= 0) { this.particles.splice(i, 1); continue; }
+      const d = Math.exp(-p.drag * dt);
+      p.vx *= d;
+      p.vy *= d;
+      p.vy += p.gravity * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.rot += p.spin * dt;
+    }
+
+    for (let i = this.texts.length - 1; i >= 0; i--) {
+      const t = this.texts[i];
+      t.life -= dt;
+      if (t.life <= 0) { this.texts.splice(i, 1); continue; }
+      t.y += t.vy * dt;
+      t.vy *= Math.exp(-2.6 * dt);
+    }
+
+    for (let i = this.rings.length - 1; i >= 0; i--) {
+      const r = this.rings[i];
+      r.life -= dt;
+      if (r.life <= 0) this.rings.splice(i, 1);
+    }
+
+    // Shake: trauma decays quadratically, offsets use layered sine noise.
+    this.trauma = Math.max(0, this.trauma - dt * 1.9);
+    const t2 = this.trauma * this.trauma;
+    const s = this.time * 47;
+    this.shakeX = t2 * 1.35 * (Math.sin(s) + 0.6 * Math.sin(s * 2.3 + 1.7));
+    this.shakeY = t2 * 1.35 * (Math.cos(s * 1.13) + 0.6 * Math.sin(s * 2.9));
+    this.shakeRot = t2 * 0.035 * Math.sin(s * 0.9);
+
+    this.flash = Math.max(0, this.flash - dt * 3.4);
+    this.zoomKick = Math.max(0, this.zoomKick - dt * 2.2);
+  }
+
+  /** Returns the simulation dt after applying hit-stop, and consumes it. */
+  simDt(realDt) {
+    if (this.freeze > 0) {
+      this.freeze -= realDt;
+      return realDt * 0.035; // a sliver of motion keeps it from looking hung
+    }
+    return realDt;
+  }
+}
+
+/** Shared helper for drawing a fading ring. */
+function ringAlpha(r) {
+  return r.fade ? 1 - easeOutCubic(1 - r.life / r.maxLife) : 1;
+}
+
+__exports.__set({ Fx, ringAlpha });
+
+};
+
+__defs["src/game/items.js"] = function (__exports, __require) {
+/** Shop catalogue helpers: pricing, availability and purchase application. */
+
+const { ITEMS } = __require("src/config.js");
+
+const ITEM_BY_ID = Object.fromEntries(ITEMS.map((i) => [i.id, i]));
+
+/** Current level of an item for a player (scaleUp/scaleDown share one axis). */
+function levelOf(player, id) {
+  if (id === 'scaleUp') return Math.max(0, player.scaleLevel);
+  if (id === 'scaleDown') return Math.max(0, -player.scaleLevel);
+  return player.upgrades[id] || 0;
+}
+
+function priceOf(player, id) {
+  const def = ITEM_BY_ID[id];
+  return def.cost(levelOf(player, id));
+}
+
+function isMaxed(player, id) {
+  const def = ITEM_BY_ID[id];
+  return levelOf(player, id) >= def.max;
+}
+
+/**
+ * Spendable gold: what you are carrying plus what is in your vault.
+ *
+ * Charging the bag alone was tried first and it warps the whole game — the bag
+ * size becomes a hard price ceiling, so anything expensive (Steal above all)
+ * can only be bought by standing around with a fat unbanked bag, which is
+ * exactly what rivals punch out of you. Letting the vault pay keeps every
+ * upgrade reachable and makes the cost honest: it comes straight off your
+ * final score.
+ */
+function funds(player) {
+  return player.bag + (player.home ? player.home.vault : 0);
+}
+
+/** Can this player afford + legally buy the item right now? */
+function canBuy(player, id) {
+  if (isMaxed(player, id)) return false;
+  return funds(player) >= priceOf(player, id);
+}
+
+/**
+ * Applies a purchase. Returns the price paid, or 0 when the buy was rejected.
+ * Carried gold is spent first, then the vault covers the remainder.
+ */
+function buy(player, id) {
+  if (!canBuy(player, id)) return 0;
+  const price = priceOf(player, id);
+  const fromBag = Math.min(player.bag, price);
+  player.bag -= fromBag;
+  const fromVault = price - fromBag;
+  if (fromVault > 0) player.home.vault -= fromVault;
+  player.spent += price;
+  player.spentFromVault = (player.spentFromVault || 0) + fromVault;
+
+  switch (id) {
+    case 'scaleUp':
+      player.scaleLevel = Math.min(ITEM_BY_ID.scaleUp.max, player.scaleLevel + 1);
+      break;
+    case 'scaleDown':
+      player.scaleLevel = Math.max(-ITEM_BY_ID.scaleDown.max, player.scaleLevel - 1);
+      break;
+    case 'steal':
+      player.upgrades.steal = 1;
+      player.canSteal = true;
+      break;
+    default:
+      player.upgrades[id] = (player.upgrades[id] || 0) + 1;
+      break;
+  }
+  player.purchases.push(id);
+  return price;
+}
+
+/** Ordered list for the shop UI, with per-player state baked in. */
+function shopRows(player) {
+  return ITEMS.map((def) => ({
+    def,
+    id: def.id,
+    level: levelOf(player, def.id),
+    price: priceOf(player, def.id),
+    maxed: isMaxed(player, def.id),
+    affordable: canBuy(player, def.id),
+    needsVault: player.bag < priceOf(player, def.id),
+  }));
+}
+
+__exports.__set({ ITEM_BY_ID, levelOf, priceOf, isMaxed, funds, canBuy, buy, shopRows });
+
+};
+
+__defs["src/game/hud.js"] = function (__exports, __require) {
+/**
+ * In-match HUD, drawn on the same canvas as the game.
+ *
+ * Each player's card sits in the screen corner nearest their base camp
+ * (NW/NE/SW/SE), so you never have to hunt for your own numbers.
+ */
+
+const { MATCH, COLORS, ITEMS } = __require("src/config.js");
+const { clamp, TAU } = __require("src/core/math.js");
+
+const CORNERS = ['nw', 'ne', 'sw', 'se'];
+
+class Hud {
+  constructor() {
+    this.pulse = 0;
+  }
+
+  draw(ctx, world, view, ui) {
+    const { w, h } = view;
+    this.pulse += 1 / 60;
+
+    this._cards(ctx, world, w, h);
+    this._timer(ctx, world, w, h);
+    this._ticker(ctx, world, w, h);
+    this._banner(ctx, world, w, h);
+    if (ui && ui.showHelp) this._help(ctx, world, w, h);
+  }
+
+  /* ----------------------------------------------------------- top clock */
+
+  _timer(ctx, world, w) {
+    const left = world.state === 'countdown' ? MATCH.duration : world.timeLeft;
+    const m = Math.floor(left / 60);
+    const s = Math.floor(left % 60);
+    const rush = world.rushing;
+    const txt = `${m}:${String(s).padStart(2, '0')}`;
+
+    const bw = 168, bh = 54;
+    const x = w / 2 - bw / 2;
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(x, 10, bw, bh, 12);
+    ctx.fillStyle = 'rgba(10,13,21,0.82)';
+    ctx.fill();
+    ctx.strokeStyle = rush ? '#ff7a3c' : 'rgba(140,155,195,0.35)';
+    ctx.lineWidth = rush ? 2.5 + Math.sin(this.pulse * 9) * 1.2 : 1.5;
+    ctx.stroke();
+
+    label(ctx, txt, w / 2, 34, {
+      size: rush ? 34 : 31, weight: 900,
+      color: rush ? '#ff9a5c' : left < 30 ? '#ffd23f' : '#eef2ff',
+    });
+    label(ctx, rush ? 'GOLD RUSH' : 'TIME LEFT', w / 2, 55, {
+      size: 10, weight: 800, color: rush ? '#ffb37a' : 'rgba(180,192,220,0.75)',
+    });
+
+    // Match progress bar
+    const p = clamp(1 - left / MATCH.duration, 0, 1);
+    ctx.beginPath();
+    ctx.roundRect(x + 10, 10 + bh - 6, bw - 20, 3, 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.roundRect(x + 10, 10 + bh - 6, (bw - 20) * p, 3, 2);
+    ctx.fillStyle = rush ? '#ff7a3c' : COLORS.gold;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /* -------------------------------------------------------- player cards */
+
+  _cards(ctx, world, w, h) {
+    const ranked = [...world.camps].sort((a, b) => b.vault - a.vault);
+    const rankOf = (i) => ranked.findIndex((c) => c.owner === i) + 1;
+    const cw = Math.min(236, Math.max(178, w * 0.19));
+    const ch = 76;
+    const pad = 12;
+
+    world.players.forEach((p, i) => {
+      const corner = CORNERS[i];
+      const x = corner[1] === 'w' ? pad : w - cw - pad;
+      const y = corner[0] === 'n' ? pad : h - ch - pad;
+      const camp = world.camps[i];
+      const rank = rankOf(i);
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(x, y, cw, ch, 10);
+      ctx.fillStyle = 'rgba(10,13,21,0.8)';
+      ctx.fill();
+      ctx.strokeStyle = rank === 1 ? COLORS.gold : hexA(p.color, 0.55);
+      ctx.lineWidth = rank === 1 ? 2.2 : 1.4;
+      ctx.stroke();
+
+      // Colour chip + name
+      ctx.beginPath();
+      ctx.roundRect(x + 9, y + 9, 16, 16, 5);
+      ctx.fillStyle = p.color;
+      ctx.fill();
+      label(ctx, p.name, x + 32, y + 18, { size: 13, weight: 800, color: '#eef2ff', align: 'left' });
+      const kind = p.isHuman ? 'YOU' : (p.profile ? p.profile.tag.toUpperCase() : 'CPU');
+      label(ctx, kind, x + cw - 10, y + 18, {
+        size: 9.5, weight: 800, align: 'right', color: p.isHuman ? '#8ee6a4' : 'rgba(160,172,200,0.8)',
+      });
+
+      // Vault
+      const vaultTxt = `${Math.floor(camp.vault)}`;
+      label(ctx, vaultTxt, x + 32, y + 41, { size: 24, weight: 900, color: COLORS.gold, align: 'left' });
+      label(ctx, 'g banked', x + 36 + textW(ctx, vaultTxt, 24, 900), y + 46, {
+        size: 10, weight: 700, color: 'rgba(200,208,230,0.65)', align: 'left',
+      });
+
+      // Rank badge
+      const rx = x + cw - 24;
+      ctx.beginPath();
+      ctx.arc(rx, y + 41, 13, 0, TAU);
+      ctx.fillStyle = rank === 1 ? COLORS.gold : 'rgba(255,255,255,0.09)';
+      ctx.fill();
+      label(ctx, `${rank}`, rx, y + 42, {
+        size: 14, weight: 900, color: rank === 1 ? '#241a05' : '#dbe2f5',
+      });
+
+      // Bag bar
+      const by = y + 58;
+      ctx.beginPath();
+      ctx.roundRect(x + 10, by, cw - 20, 9, 4);
+      ctx.fillStyle = 'rgba(255,255,255,0.1)';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.roundRect(x + 10, by, (cw - 20) * p.bagFill, 9, 4);
+      ctx.fillStyle = p.bagFill > 0.95 ? '#fff2b0' : COLORS.gold;
+      ctx.fill();
+      label(ctx, `${Math.floor(p.bag)}/${p.bagCap}`, x + cw / 2, by + 5, {
+        size: 9, weight: 800, color: p.bagFill > 0.5 ? '#3a2c05' : 'rgba(230,236,250,0.85)', outline: null,
+      });
+
+      // Upgrade pips
+      let px = x + 10;
+      const py = y + ch - 3;
+      for (const def of ITEMS) {
+        const lvl = def.id === 'scaleUp' ? Math.max(0, p.scaleLevel)
+          : def.id === 'scaleDown' ? Math.max(0, -p.scaleLevel)
+            : p.upgrades[def.id];
+        if (!lvl) continue;
+        ctx.beginPath();
+        ctx.roundRect(px, py - 4, 4 + lvl * 5, 5, 2.5);
+        ctx.fillStyle = PIP_COLORS[def.id] || '#fff';
+        ctx.fill();
+        px += 8 + lvl * 5;
+      }
+      if (p.canSteal) {
+        label(ctx, 'THIEF', x + cw - 10, py - 1, { size: 8.5, weight: 900, color: '#ff9d5d', align: 'right' });
+      }
+      ctx.restore();
+    });
+  }
+
+  /* -------------------------------------------------------------- ticker */
+
+  _ticker(ctx, world, w, h) {
+    if (!world.events.length) return;
+    ctx.save();
+    let y = h - 96;
+    for (let i = world.events.length - 1; i >= 0; i--) {
+      const e = world.events[i];
+      ctx.globalAlpha = clamp(e.life / 1.2, 0, 1) * 0.95;
+      label(ctx, e.text, w / 2, y, { size: 12.5, weight: 700, color: e.color || '#dfe6f8' });
+      y -= 19;
+    }
+    ctx.restore();
+  }
+
+  /* -------------------------------------------------------------- banner */
+
+  _banner(ctx, world, w, h) {
+    const b = world.banner;
+    if (!b) return;
+    const t = 1 - b.life / b.maxLife;
+    const pop = t < 0.25 ? 0.6 + (t / 0.25) * 0.5 : 1 - Math.max(0, (t - 0.7) / 0.3) * 0.2;
+    ctx.save();
+    ctx.globalAlpha = clamp(b.life * 2.2, 0, 1);
+    ctx.translate(w / 2, h * 0.3);
+    ctx.scale(pop, pop);
+    label(ctx, b.text, 0, 0, { size: 58, weight: 900, color: b.color, outline: '#0b0d14' });
+    ctx.restore();
+  }
+
+  /* ---------------------------------------------------------------- help */
+
+  _help(ctx, world, w, h) {
+    const humans = world.players.filter((p) => p.isHuman);
+    const lines = humans.map((p) => `${p.name}: ${p.controller?.label || ''}`);
+    lines.push('Tap punch = jab  ·  Hold punch = charged smash  ·  Bank gold at YOUR camp before time runs out');
+    ctx.save();
+    let y = h - 46;
+    for (const l of lines) {
+      label(ctx, l, w / 2, y, { size: 11.5, weight: 700, color: 'rgba(190,200,225,0.75)' });
+      y += 16;
+    }
+    ctx.restore();
+  }
+}
+
+const PIP_COLORS = {
+  attackUp: '#ff7a6b',
+  defenseUp: '#6fb7ff',
+  goldBagUp: '#ffd23f',
+  baseCampUp: '#8ee6a4',
+  scaleUp: '#d69bff',
+  scaleDown: '#9befe0',
+  steal: '#ff9d5d',
+};
+
+function label(ctx, text, x, y, {
+  size = 12, color = '#fff', weight = 700, align = 'center', outline = '#0b0d14',
+} = {}) {
+  ctx.font = `${weight} ${size}px "Trebuchet MS", "Segoe UI", system-ui, sans-serif`;
+  ctx.textAlign = align;
+  ctx.textBaseline = 'middle';
+  if (outline) {
+    ctx.lineWidth = Math.max(2, size * 0.24);
+    ctx.strokeStyle = outline;
+    ctx.lineJoin = 'round';
+    ctx.strokeText(text, x, y);
+  }
+  ctx.fillStyle = color;
+  ctx.fillText(text, x, y);
+}
+
+function textW(ctx, text, size, weight) {
+  ctx.font = `${weight} ${size}px "Trebuchet MS", "Segoe UI", system-ui, sans-serif`;
+  return ctx.measureText(text).width;
+}
+
+function hexA(hex, a) {
+  const h = hex.replace('#', '');
+  const n = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+__exports.__set({ Hud, label });
+
+};
+
+__defs["src/game/world.js"] = function (__exports, __require) {
+/**
+ * World: arena construction, the fixed simulation step, and every interaction
+ * that involves more than one entity (punches, robbery, deposits, purchases).
+ *
+ * Layout (metres, +y is down / south):
+ *
+ *              small popper (0,-20)
+ *   camp NW ....................... camp NE      camps sit 25m from centre
+ *              [ pillar rocks ]
+ *   shop W  ....  BIG POPPER  ....  shop E
+ *              [ pillar rocks ]
+ *   camp SW ....................... camp SE
+ *              small popper (0, 20)
+ *
+ * The four camps sit on the diagonals so every player is exactly the same
+ * distance from the big popper, from one small popper and from one shop.
+ */
+
+const { ARENA, MATCH, PLAYER, COMBAT, CAMP, SHOP, PICKUP, COLORS, ITEMS, DIFFICULTY, NPC_PROFILES } = __require("src/config.js");
+const { clamp, lerp, dist, angleDelta, sign, makeRng, circlePush } = __require("src/core/math.js");
+const { Fx } = __require("src/core/fx.js");
+const { sfx } = __require("src/core/audio.js");
+const { NavGrid } = __require("src/game/nav.js");
+const { Player, CoinPopper, BaseCamp, Shop, Rock, scatterGold } = __require("src/game/entities.js");
+const { NpcBrain } = __require("src/game/npc.js");
+const { buy, canBuy, priceOf, isMaxed, funds } = __require("src/game/items.js");
+
+const DIAG = Math.SQRT1_2;
+
+class World {
+  /**
+   * @param {object} setup { slots: [{type:'human'|'cpu', controller, profile}], difficulty, seed }
+   */
+  constructor(setup) {
+    this.setup = setup;
+    this.rng = makeRng(setup.seed ?? (Date.now() & 0xffff));
+    this.fx = new Fx();
+    this.sfx = sfx;
+    this.diff = DIFFICULTY[setup.difficulty] || DIFFICULTY.normal;
+
+    this.time = 0;
+    this.state = 'countdown';       // countdown | playing | ended
+    this.countdown = MATCH.countdown + 0.999;
+    this.rushStarted = false;
+    this.banner = null;
+    this.results = null;
+    this.events = [];               // ticker feed for the HUD
+
+    this._buildArena();
+    this._buildPlayers();
+
+    this.announce('GET READY', COLORS.text, 1.2);
+  }
+
+  /* ------------------------------------------------------------- creation */
+
+  _buildArena() {
+    this.camps = [];
+    // NW, NE, SW, SE — evenly spaced on the diagonals, 25m from the centre.
+    const angles = [-135, -45, 135, 45].map((d) => (d * Math.PI) / 180);
+    for (let i = 0; i < 4; i++) {
+      const a = angles[i];
+      this.camps.push(new BaseCamp(i, Math.cos(a) * ARENA.campRadius, Math.sin(a) * ARENA.campRadius));
+    }
+    this.campAngles = angles;
+
+    this.poppers = [
+      new CoinPopper('big', 0, 0, 'MOTHERLODE'),
+      new CoinPopper('small', 0, -20, 'NORTH'),
+      new CoinPopper('small', 0, 20, 'SOUTH'),
+    ];
+    this.bigPopper = this.poppers[0];
+
+    this.shops = [new Shop('west', -20, 0), new Shop('east', 20, 0)];
+
+    this.rocks = [];
+    // Four pillars framing the centre chamber; entrances face the camps.
+    for (let i = 0; i < 4; i++) {
+      const a = (i * Math.PI) / 2;
+      this.rocks.push(new Rock(Math.cos(a) * 6.6, Math.sin(a) * 6.6, 1.5, 100 + i));
+    }
+    // Gate pairs on each camp->centre lane, so the approach is a choke point.
+    for (let i = 0; i < 4; i++) {
+      const a = this.campAngles[i];
+      const cx = Math.cos(a) * 13.5;
+      const cy = Math.sin(a) * 13.5;
+      const px = -Math.sin(a);
+      const py = Math.cos(a);
+      this.rocks.push(new Rock(cx + px * 4.4, cy + py * 4.4, 1.6, 200 + i * 2));
+      this.rocks.push(new Rock(cx - px * 4.4, cy - py * 4.4, 1.6, 201 + i * 2));
+    }
+    // Outer cover behind the shops and small poppers.
+    for (let i = 0; i < 4; i++) {
+      const a = (i * Math.PI) / 2;
+      this.rocks.push(new Rock(Math.cos(a) * 28, Math.sin(a) * 28, 2.3, 300 + i));
+    }
+
+    // Static blockers for both physics and navigation.
+    this.blockers = [
+      ...this.rocks.map((r) => ({ x: r.x, y: r.y, r: r.radius, kind: 'rock', ref: r })),
+      ...this.poppers.map((p) => ({ x: p.x, y: p.y, r: p.radius, kind: 'popper', ref: p })),
+      ...this.shops.map((s) => ({ x: s.x, y: s.y, r: s.radius, kind: 'shop', ref: s })),
+    ];
+    this.nav = new NavGrid({ half: ARENA.half, cornerCut: ARENA.cornerCut }, this.blockers);
+
+    this.pickups = [];
+  }
+
+  _buildPlayers() {
+    this.players = [];
+    const slots = this.setup.slots;
+    for (let i = 0; i < 4; i++) {
+      const slot = slots[i];
+      const camp = this.camps[i];
+      const a = this.campAngles[i];
+      const p = new Player(i, {
+        name: slot.name,
+        isHuman: slot.type === 'human',
+        controller: slot.controller,
+        home: camp,
+        x: camp.x - Math.cos(a) * 1.6,
+        y: camp.y - Math.sin(a) * 1.6,
+        facing: a + Math.PI,
+      });
+      if (slot.type === 'cpu') {
+        const profile = slot.profile || NPC_PROFILES[i % NPC_PROFILES.length];
+        p.profile = profile;
+        p.brain = new NpcBrain(p, profile, this.diff, this.nav, 1234 + i * 77);
+      }
+      this.players.push(p);
+    }
+  }
+
+  /* -------------------------------------------------------------- helpers */
+
+  get timeLeft() { return Math.max(0, MATCH.duration - this.time); }
+  get rushing() { return this.state === 'playing' && this.timeLeft <= MATCH.rushAt; }
+
+  get leaderIndex() {
+    let best = 0;
+    for (let i = 1; i < 4; i++) if (this.camps[i].vault > this.camps[best].vault) best = i;
+    return best;
+  }
+
+  playersNear(x, y, r, exclude = null) {
+    return this.players.filter((p) => p !== exclude && p.alive && dist(p.x, p.y, x, y) <= r);
+  }
+
+  announce(text, color = COLORS.text, life = 1.6) {
+    this.banner = { text, color, life, maxLife: life };
+  }
+
+  logEvent(text, color) {
+    this.events.push({ text, color, life: 3.4 });
+    if (this.events.length > 5) this.events.shift();
+  }
+
+  /* --------------------------------------------------------------- update */
+
+  /** @param {number} realDt seconds of wall-clock time since the last frame */
+  update(realDt) {
+    const dt = this.fx.simDt(realDt);
+    this.fx.update(realDt);
+
+    if (this.banner) {
+      this.banner.life -= realDt;
+      if (this.banner.life <= 0) this.banner = null;
+    }
+    for (let i = this.events.length - 1; i >= 0; i--) {
+      this.events[i].life -= realDt;
+      if (this.events[i].life <= 0) this.events.splice(i, 1);
+    }
+
+    if (this.state === 'countdown') {
+      const prev = Math.ceil(this.countdown);
+      this.countdown -= realDt;
+      const now = Math.ceil(this.countdown);
+      if (now !== prev) {
+        if (now > 0) { this.announce(String(now), COLORS.text, 0.9); this.sfx.beep(false); }
+      }
+      if (this.countdown <= 0) {
+        this.state = 'playing';
+        this.announce('GO!', COLORS.gold, 1.0);
+        this.sfx.beep(true);
+      }
+      // Poppers still tick during the countdown so the opening rush matters.
+      for (const p of this.poppers) p.update(dt, this, 0);
+      for (const c of this.camps) c.update(dt);
+      return;
+    }
+
+    if (this.state === 'ended') {
+      for (const p of this.poppers) p.update(dt, this, 0);
+      for (const c of this.camps) c.update(dt);
+      for (const g of this.pickups) g.update(dt, []);
+      return;
+    }
+
+    this.time += dt;
+    if (!this.rushStarted && this.rushing) {
+      this.rushStarted = true;
+      this.bigPopper.gold = Math.min(this.bigPopper.cap, this.bigPopper.gold + MATCH.rushBurst);
+      this.bigPopper.addShake(1.2);
+      this.fx.shake(0.6);
+      this.announce('GOLD RUSH!', COLORS.gold, 2.0);
+      this.logEvent('Poppers overflowing — final 25 seconds!', COLORS.gold);
+      this.sfx.rush();
+    }
+    if (this.time >= MATCH.duration) { this._finish(); return; }
+
+    const rateMul = this.rushing ? MATCH.rushPopperMultiplier : 1;
+    for (const pop of this.poppers) pop.update(dt, this, rateMul);
+    for (const camp of this.camps) camp.update(dt);
+    for (const shop of this.shops) { shop.update(dt); shop.customers.clear(); }
+
+    // --- brains write into their virtual controllers before the sim step ---
+    for (const p of this.players) if (p.brain) p.brain.update(dt, this);
+
+    for (const p of this.players) p.update(dt, this);
+
+    this._resolveCollisions(dt);
+    this._resolveInteractions(dt);
+    this._resolvePunches(dt);
+    this._updatePickups(dt);
+  }
+
+  _finish() {
+    this.state = 'ended';
+    this.time = MATCH.duration;
+    this.sfx.chargeStop();
+    this.sfx.fanfare();
+    this.fx.shake(0.5);
+
+    const rows = this.players.map((p, i) => {
+      const vault = this.camps[i].vault;
+      const bonus = vault * p.endBonusRate;
+      return {
+        index: i,
+        name: p.name,
+        isHuman: p.isHuman,
+        profile: p.profile || null,
+        color: p.color,
+        vault,
+        bonus,
+        total: vault + bonus,
+        carried: p.bag,
+        stats: p.stats,
+        upgrades: { ...p.upgrades },
+        scaleLevel: p.scaleLevel,
+      };
+    });
+    rows.sort((a, b) => b.total - a.total);
+    rows.forEach((r, i) => { r.place = i + 1; });
+    this.results = rows;
+    this.announce(`${rows[0].name} WINS`, rows[0].color, 3);
+
+    for (const c of this.camps) { c.shake = 0.7; c.flash = 1; }
+    for (let i = 0; i < 40; i++) {
+      const a = this.rng.angle();
+      const r = this.rng.range(0, 12);
+      this.fx.burst(Math.cos(a) * r, Math.sin(a) * r, {
+        count: 2, color: COLORS.gold, speed: [3, 10], life: [0.6, 1.4],
+        size: [0.12, 0.26], gravity: 9, drag: 1.1, shape: 'coin',
+      });
+    }
+  }
+
+  /* ---------------------------------------------------------- collisions */
+
+  _resolveCollisions(dt) {
+    // Players vs static blockers.
+    for (const p of this.players) {
+      for (const b of this.blockers) {
+        const push = circlePush(p.x, p.y, p.radius, b.x, b.y, b.r);
+        if (push) {
+          p.x += push[0];
+          p.y += push[1];
+          const nl = Math.hypot(push[0], push[1]) || 1;
+          const nx = push[0] / nl, ny = push[1] / nl;
+          const vn = p.vx * nx + p.vy * ny;
+          if (vn < 0) {
+            p.vx -= vn * nx * (1 + ARENA.wallBounce);
+            p.vy -= vn * ny * (1 + ARENA.wallBounce);
+          }
+          if (b.kind === 'popper' && p.dashTimer > 0) b.ref.addShake(0.25);
+        }
+      }
+      this._clampToArena(p);
+    }
+
+    // Players vs players (soft, mass scales with size).
+    for (let i = 0; i < this.players.length; i++) {
+      for (let j = i + 1; j < this.players.length; j++) {
+        const a = this.players[i], b = this.players[j];
+        const push = circlePush(a.x, a.y, a.radius, b.x, b.y, b.radius);
+        if (!push) continue;
+        const ma = a.scale, mb = b.scale;
+        const ta = mb / (ma + mb), tb = ma / (ma + mb);
+        a.x += push[0] * ta; a.y += push[1] * ta;
+        b.x -= push[0] * tb; b.y -= push[1] * tb;
+      }
+    }
+    for (const p of this.players) this._clampToArena(p);
+  }
+
+  _clampToArena(p) {
+    const lim = ARENA.half - p.radius;
+    if (p.x < -lim) { p.x = -lim; p.vx = Math.abs(p.vx) * ARENA.wallBounce; }
+    if (p.x > lim) { p.x = lim; p.vx = -Math.abs(p.vx) * ARENA.wallBounce; }
+    if (p.y < -lim) { p.y = -lim; p.vy = Math.abs(p.vy) * ARENA.wallBounce; }
+    if (p.y > lim) { p.y = lim; p.vy = -Math.abs(p.vy) * ARENA.wallBounce; }
+
+    // Chamfered corners: |x| + |y| <= D.
+    const D = ARENA.half * 2 - ARENA.cornerCut - p.radius * Math.SQRT2;
+    const s = Math.abs(p.x) + Math.abs(p.y);
+    if (s > D) {
+      const over = (s - D) / 2;
+      const sx = sign(p.x) || 1;
+      const sy = sign(p.y) || 1;
+      p.x -= sx * over;
+      p.y -= sy * over;
+      const vn = p.vx * sx * DIAG + p.vy * sy * DIAG;
+      if (vn > 0) {
+        p.vx -= vn * sx * DIAG * (1 + ARENA.wallBounce);
+        p.vy -= vn * sy * DIAG * (1 + ARENA.wallBounce);
+      }
+    }
+  }
+
+  /* ------------------------------------------- harvest / bank / shop zones */
+
+  _resolveInteractions(dt) {
+    for (const p of this.players) {
+      if (!p.alive) continue;
+
+      // --- coin poppers ---
+      for (const pop of this.poppers) {
+        if (dist(p.x, p.y, pop.x, pop.y) <= pop.reach + p.radius) {
+          pop.harvest(p, dt, this);
+        }
+      }
+
+      // --- own base camp: deposit ---
+      const home = p.home;
+      if (p.bag > 0 && dist(p.x, p.y, home.x, home.y) <= home.radius + p.radius * 0.5) {
+        const moved = Math.min(p.bag, p.depositRate * dt);
+        p.bag -= moved;
+        home.vault += moved;
+        p.stats.banked += moved;
+        p.depositing = 1;
+        home.depositGlow = 1;
+        home.shake = Math.min(0.5, home.shake + dt * 1.4);
+        p._depositTick = (p._depositTick || 0) + moved;
+        if (p._depositTick > 14) {
+          p._depositTick = 0;
+          if (p.isHuman) this.sfx.deposit();
+          this.fx.burst(p.x, p.y, {
+            count: 3, color: COLORS.gold, speed: [2, 5], life: [0.25, 0.5],
+            size: [0.1, 0.2], shape: 'coin', drag: 3,
+          });
+          this.fx.ring(home.x, home.y, { r0: home.radius * 0.4, r1: home.radius, life: 0.3, color: home.color, width: 0.16 });
+        }
+        if (p.bag <= 0.01) {
+          p.bag = 0;
+          this.fx.ring(home.x, home.y, { r0: 0.5, r1: home.radius * 1.5, life: 0.4, color: COLORS.gold, width: 0.22 });
+        }
+      }
+
+      // --- shops ---
+      let inShop = null;
+      for (const s of this.shops) {
+        if (dist(p.x, p.y, s.x, s.y) <= SHOP.browseRange + p.radius) { inShop = s; break; }
+      }
+      if (inShop !== p.shop) {
+        p.buyHold = 0;
+        p.shop = inShop;
+        if (inShop) { inShop.flash = 0.6; if (p.isHuman) this.sfx.pop(); }
+      }
+      if (inShop) inShop.customers.add(p.index);
+    }
+  }
+
+  /* ------------------------------------------------------------- punching */
+
+  /** Called by Player when a swing reaches its active frames. */
+  registerPunch(p) {
+    const o = p.punchOrigin();
+    const power = p.punchPower;
+    this.fx.ring(o.x, o.y, {
+      r0: 0.2, r1: o.range * (0.8 + power * 0.6), life: 0.18 + power * 0.1,
+      color: power > 0 ? '#fff0b0' : '#ffffff', width: 0.12 + power * 0.16,
+    });
+    this.fx.burst(o.x, o.y, {
+      count: 4 + Math.round(power * 8), color: power > 0 ? '#ffe08a' : '#cfd8ff',
+      speed: [3, 8 + power * 8], life: [0.12, 0.3], size: [0.06, 0.16],
+      dir: p.facing, spread: COMBAT.punchArc, drag: 7,
+    });
+    this.sfx.punch(power);
+  }
+
+  _resolvePunches(dt) {
+    for (const p of this.players) {
+      if (p.phase !== 'active') continue;
+      const o = p.punchOrigin();
+      const power = p.punchPower;
+
+      // --- players ---
+      for (const v of this.players) {
+        if (v === p || !v.alive || p.hitSet.has(v)) continue;
+        if (v.invuln > 0) continue;
+        const d = dist(p.x, p.y, v.x, v.y);
+        if (d > p.radius + v.radius + o.range * 0.85) continue;
+        const ang = Math.atan2(v.y - p.y, v.x - p.x);
+        if (Math.abs(angleDelta(p.facing, ang)) > COMBAT.punchArc * 0.5 + 0.25) continue;
+        p.hitSet.add(v);
+        this._landHit(p, v, power);
+      }
+
+      // --- enemy base camps (requires the Steal upgrade) ---
+      if (p.canSteal) {
+        for (const camp of this.camps) {
+          if (camp.owner === p.index || p.hitSet.has(camp)) continue;
+          const d = dist(p.x, p.y, camp.x, camp.y);
+          if (d > p.radius + camp.radius + o.range * 0.8) continue;
+          p.hitSet.add(camp);
+          this._raidCamp(p, camp, power);
+        }
+      }
+
+      // --- coin poppers: a punch shakes coins loose ---
+      for (const pop of this.poppers) {
+        if (p.hitSet.has(pop)) continue;
+        const d = dist(p.x, p.y, pop.x, pop.y);
+        if (d > p.radius + pop.radius + o.range * 0.8) continue;
+        p.hitSet.add(pop);
+        this._punchPopper(p, pop, power);
+      }
+    }
+  }
+
+  _landHit(attacker, victim, power) {
+    const isCharged = power > 0;
+    // How much of the victim's bag comes loose.
+    let frac = isCharged
+      ? lerp(COMBAT.chargedStealMin, COMBAT.chargedStealMax, power)
+      : COMBAT.lightSteal;
+    frac *= attacker.attackMul * victim.defenseMul;
+    frac = clamp(frac, 0.05, 0.95);
+
+    let amount = victim.bag * frac;
+    if (victim.bag > 0) amount = Math.max(amount, Math.min(COMBAT.minSteal, victim.bag));
+    amount = Math.min(amount, victim.bag);
+    amount = Math.round(amount);
+
+    victim.bag -= amount;
+    victim.stats.lost += amount;
+    victim.stats.punchesTaken++;
+    attacker.stats.punchesLanded++;
+
+    const taken = attacker.addGold(Math.round(amount * COMBAT.attackerShare));
+    attacker.stats.robbed += taken;
+    const dropped = amount - taken;
+
+    const ang = Math.atan2(victim.y - attacker.y, victim.x - attacker.x);
+    if (dropped > 0.5) scatterGold(this, victim.x, victim.y, dropped, victim.index, ang);
+
+    const force = (isCharged
+      ? lerp(COMBAT.knockbackChargedMin, COMBAT.knockbackChargedMax, power)
+      : COMBAT.knockbackLight) * attacker.attackMul;
+    victim.takeKnockback(Math.cos(ang), Math.sin(ang), force);
+    victim.stun = PLAYER.stunTime + (isCharged ? COMBAT.stunChargedBonus * power : 0);
+    victim.invuln = PLAYER.invulnAfterHit;
+    victim.hitFlash = 1;
+    victim.squash = 1.35;
+    victim.charging = false;
+    victim.chargeTime = 0;
+    victim.phase = 'idle';
+    victim.phaseTimer = 0;
+
+    // --- juice ---
+    const hs = isCharged
+      ? lerp(COMBAT.hitstopChargedMin, COMBAT.hitstopChargedMax, power)
+      : COMBAT.hitstopLight;
+    this.fx.hitstop(hs);
+    this.fx.shake(isCharged ? lerp(COMBAT.shakeLight, COMBAT.shakeCharged, power) : COMBAT.shakeLight);
+    this.fx.kick(isCharged ? 0.5 + power * 0.5 : 0.22);
+    if (isCharged && power > 0.6) this.fx.whiteFlash(0.18 + power * 0.22);
+
+    const hx = (attacker.x + victim.x) / 2;
+    const hy = (attacker.y + victim.y) / 2;
+    this.fx.ring(hx, hy, {
+      r0: 0.3, r1: 2.4 + power * 3.4, life: 0.26 + power * 0.14,
+      color: '#ffffff', width: 0.2 + power * 0.3,
+    });
+    this.fx.burst(hx, hy, {
+      count: 10 + Math.round(power * 18), color: '#fff6d0',
+      speed: [5, 12 + power * 16], life: [0.16, 0.42], size: [0.07, 0.2],
+      dir: ang, spread: 2.1, drag: 6,
+    });
+    if (amount > 0) {
+      this.fx.burst(victim.x, victim.y, {
+        count: Math.min(16, 3 + Math.round(amount / 5)), color: COLORS.gold,
+        speed: [3, 9], life: [0.3, 0.7], size: [0.1, 0.2],
+        dir: ang, spread: 2.6, gravity: 10, drag: 2, shape: 'coin',
+      });
+      this.fx.text(victim.x, victim.y - victim.radius - 0.6, `-${amount}`, {
+        color: '#ff8b8b', size: 1 + Math.min(0.7, amount / 60), life: 0.9,
+      });
+      if (taken > 0) {
+        this.fx.text(attacker.x, attacker.y - attacker.radius - 0.6, `+${taken}`, {
+          color: COLORS.gold, size: 1 + Math.min(0.6, taken / 60), life: 0.9,
+        });
+      }
+    }
+    if (isCharged && power > 0.75) {
+      this.logEvent(`${attacker.name} SMASHED ${victim.name} for ${amount}g`, attacker.color);
+    }
+  }
+
+  _raidCamp(thief, camp, power) {
+    const cool = thief.lastStolenFrom.get(camp.owner) || 0;
+    if (cool > 0) {
+      this.fx.text(camp.x, camp.y - camp.radius, `${cool.toFixed(1)}s`, { color: '#9aa6c4', size: 0.85, life: 0.6 });
+      this.sfx.deny();
+      return;
+    }
+    const owner = this.players[camp.owner];
+    let amount = Math.min(
+      Math.max(CAMP.stealMin, camp.vault * CAMP.stealFraction * (1 + power * 0.5) * owner.campArmor),
+      CAMP.stealCap,
+      camp.vault,
+      thief.bagSpace,
+    );
+    amount = Math.round(amount);
+    if (amount <= 0) {
+      this.sfx.deny();
+      this.fx.text(camp.x, camp.y - camp.radius, camp.vault < 1 ? 'EMPTY' : 'BAG FULL', {
+        color: '#9aa6c4', size: 0.9, life: 0.8,
+      });
+      return;
+    }
+
+    camp.vault -= amount;
+    thief.bag += amount;
+    thief.stats.campRaids++;
+    thief.stats.raidedFor += amount;
+    owner.stats.lost += amount;
+    thief.lastStolenFrom.set(camp.owner, CAMP.stealCooldown);
+
+    camp.shake = 1;
+    camp.flash = 1;
+    camp.alarm = 1.6;
+    this.fx.hitstop(0.07);
+    this.fx.shake(0.45);
+    this.fx.ring(camp.x, camp.y, { r0: 0.4, r1: camp.radius * 1.8, life: 0.45, color: '#ff5d5d', width: 0.26 });
+    this.fx.burst(camp.x, camp.y, {
+      count: 18, color: COLORS.gold, speed: [4, 11], life: [0.3, 0.7],
+      size: [0.1, 0.22], gravity: 10, drag: 2, shape: 'coin',
+    });
+    this.fx.text(camp.x, camp.y - camp.radius - 0.4, `STOLEN ${amount}`, { color: '#ff9d5d', size: 1.25, life: 1.1 });
+    this.sfx.steal();
+    this.sfx.alarm();
+    this.logEvent(`${thief.name} raided ${owner.name}'s vault for ${amount}g`, thief.color);
+  }
+
+  _punchPopper(p, pop, power) {
+    if (pop.gold <= 0) {
+      pop.addShake(0.5);
+      return;
+    }
+    const amount = Math.round(Math.min(pop.gold, 5 + power * 11));
+    pop.gold -= amount;
+    pop.addShake(1.1 + power * 0.3);
+    const ang = Math.atan2(pop.y - p.y, pop.x - p.x);
+    scatterGold(this, pop.x, pop.y, amount, -1, ang + Math.PI);
+    this.fx.hitstop(0.03 + power * 0.03);
+    this.fx.shake(0.18 + power * 0.2);
+    this.fx.ring(pop.x, pop.y, { r0: pop.radius * 0.5, r1: pop.radius * 2, life: 0.3, color: COLORS.gold, width: 0.2 });
+    this.sfx.coin(2);
+  }
+
+  /* -------------------------------------------------------------- pickups */
+
+  _updatePickups(dt) {
+    for (let i = this.pickups.length - 1; i >= 0; i--) {
+      const g = this.pickups[i];
+      g.update(dt, this.players);
+      if (g.dead) { this.pickups.splice(i, 1); continue; }
+
+      for (const p of this.players) {
+        if (!p.alive || p.bagSpace <= 0) continue;
+        if (g.lock > 0 && p.index === g.owner) continue;
+        if (dist(p.x, p.y, g.x, g.y) > p.radius + PICKUP.radius + 0.3) continue;
+        const got = p.addGold(g.amount);
+        this.fx.text(p.x, p.y - p.radius - 0.5, `+${Math.round(got)}`, {
+          color: COLORS.gold, size: 0.85, life: 0.6, vy: -3,
+        });
+        this.fx.burst(g.x, g.y, {
+          count: 4, color: COLORS.gold, speed: [2, 5], life: [0.2, 0.4],
+          size: [0.08, 0.16], shape: 'coin', drag: 4,
+        });
+        if (p.isHuman) this.sfx.coin(1);
+        this.pickups.splice(i, 1);
+        break;
+      }
+    }
+    // Keep the floor from filling with thousands of blobs.
+    if (this.pickups.length > 160) this.pickups.splice(0, this.pickups.length - 160);
+  }
+
+  /* ------------------------------------------------------------ purchases */
+
+  tryBuy(player, itemId) {
+    const shop = player.shop;
+    if (!shop) return false;
+    if (isMaxed(player, itemId)) {
+      this.sfx.deny();
+      this.fx.text(player.x, player.y - player.radius - 0.7, 'MAXED', { color: '#9aa6c4', size: 0.9, life: 0.7 });
+      return false;
+    }
+    if (!canBuy(player, itemId)) {
+      this.sfx.deny();
+      const need = priceOf(player, itemId) - Math.floor(funds(player));
+      this.fx.text(player.x, player.y - player.radius - 0.7, `NEED ${Math.ceil(need)}g`, {
+        color: '#ff8b8b', size: 0.9, life: 0.8,
+      });
+      return false;
+    }
+    const paid = buy(player, itemId);
+    const def = ITEMS.find((i) => i.id === itemId);
+    shop.flash = 1;
+    this.sfx.buy();
+    this.fx.hitstop(0.04);
+    this.fx.ring(player.x, player.y, { r0: 0.3, r1: 2.6, life: 0.4, color: player.color, width: 0.2 });
+    this.fx.burst(player.x, player.y, {
+      count: 16, color: player.color, speed: [3, 9], life: [0.3, 0.6],
+      size: [0.08, 0.2], drag: 4, glow: true,
+    });
+    this.fx.text(player.x, player.y - player.radius - 0.8, def.name.toUpperCase(), {
+      color: player.color, size: 1.1, life: 1.0,
+    });
+    this.fx.text(player.x, player.y - player.radius - 1.7, `-${paid}g`, {
+      color: '#ffd98a', size: 0.85, life: 0.9,
+    });
+    if (itemId === 'steal') {
+      this.logEvent(`${player.name} bought STEAL — vaults are no longer safe`, player.color);
+      this.announce(`${player.name} CAN RAID VAULTS`, player.color, 1.6);
+      for (const c of this.camps) if (c.owner !== player.index) c.alarm = 1.2;
+    }
+    return true;
+  }
+
+  /* ---------------------------------------------------------------- debug */
+
+  totalGoldInPlay() {
+    let g = 0;
+    for (const p of this.poppers) g += p.gold;
+    for (const p of this.players) g += p.bag;
+    for (const c of this.camps) g += c.vault;
+    for (const k of this.pickups) g += k.amount;
+    return g;
+  }
+}
+
+__exports.__set({ World });
+
+};
+
+__defs["src/game/nav.js"] = function (__exports, __require) {
+/**
+ * Navigation for the AI.
+ *
+ * The arena is an open octagon dotted with circular blockers (rocks, shops,
+ * poppers). Pure steering gets stuck on those, so bots path properly:
+ *
+ *   1. `NavGrid` rasterises the static blockers into a coarse grid, inflated by
+ *      the agent radius so a path never clips a corner.
+ *   2. A* (8-way, no corner cutting) finds a cell route.
+ *   3. The route is string-pulled with line-of-sight tests so bots run in
+ *      straight diagonals instead of following the grid staircase.
+ *   4. `PathFollower` walks the waypoints and adds local avoidance for the
+ *      dynamic stuff (other players), plus a repath timer.
+ */
+
+const { NAV } = __require("src/config.js");
+const { dist, segmentHitsCircle, clamp } = __require("src/core/math.js");
+
+class MinHeap {
+  constructor() { this.a = []; }
+  get size() { return this.a.length; }
+  push(node) {
+    const a = this.a;
+    a.push(node);
+    let i = a.length - 1;
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (a[p].f <= a[i].f) break;
+      [a[p], a[i]] = [a[i], a[p]];
+      i = p;
+    }
+  }
+  pop() {
+    const a = this.a;
+    const top = a[0];
+    const last = a.pop();
+    if (a.length) {
+      a[0] = last;
+      let i = 0;
+      for (;;) {
+        const l = i * 2 + 1;
+        const r = l + 1;
+        let m = i;
+        if (l < a.length && a[l].f < a[m].f) m = l;
+        if (r < a.length && a[r].f < a[m].f) m = r;
+        if (m === i) break;
+        [a[m], a[i]] = [a[i], a[m]];
+        i = m;
+      }
+    }
+    return top;
+  }
+}
+
+class NavGrid {
+  /**
+   * @param {object} bounds  { half, cornerCut } octagon description
+   * @param {Array}  blockers [{x,y,r}]
+   */
+  constructor(bounds, blockers) {
+    this.bounds = bounds;
+    this.blockers = blockers;
+    this.cell = NAV.cell;
+    this.min = -bounds.half;
+    this.cols = Math.ceil((bounds.half * 2) / this.cell);
+    this.rows = this.cols;
+    this.blocked = new Uint8Array(this.cols * this.rows);
+    this.rebuild();
+  }
+
+  rebuild() {
+    const c = this.cell;
+    const clearance = NAV.agentClearance;
+    for (let gy = 0; gy < this.rows; gy++) {
+      for (let gx = 0; gx < this.cols; gx++) {
+        const x = this.min + (gx + 0.5) * c;
+        const y = this.min + (gy + 0.5) * c;
+        let bad = !this.insideArena(x, y, clearance);
+        if (!bad) {
+          for (const b of this.blockers) {
+            const rr = b.r + clearance;
+            if (dist(x, y, b.x, b.y) < rr) { bad = true; break; }
+          }
+        }
+        this.blocked[gy * this.cols + gx] = bad ? 1 : 0;
+      }
+    }
+  }
+
+  insideArena(x, y, margin = 0) {
+    const h = this.bounds.half - margin;
+    if (x < -h || x > h || y < -h || y > h) return false;
+    const diag = this.bounds.half * 2 - this.bounds.cornerCut - margin * 1.42;
+    return Math.abs(x) + Math.abs(y) <= diag;
+  }
+
+  gx(x) { return clamp(Math.floor((x - this.min) / this.cell), 0, this.cols - 1); }
+  gy(y) { return clamp(Math.floor((y - this.min) / this.cell), 0, this.rows - 1); }
+  wx(gx) { return this.min + (gx + 0.5) * this.cell; }
+  wy(gy) { return this.min + (gy + 0.5) * this.cell; }
+  isBlocked(gx, gy) {
+    if (gx < 0 || gy < 0 || gx >= this.cols || gy >= this.rows) return true;
+    return this.blocked[gy * this.cols + gx] === 1;
+  }
+
+  /** Nearest walkable cell, spiralling outwards. Used when a goal sits inside a blocker. */
+  nearestFree(gx, gy, maxRadius = 14) {
+    if (!this.isBlocked(gx, gy)) return [gx, gy];
+    for (let r = 1; r <= maxRadius; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          if (!this.isBlocked(gx + dx, gy + dy)) return [gx + dx, gy + dy];
+        }
+      }
+    }
+    return null;
+  }
+
+  /** True when a straight run from a->b touches nothing static. */
+  lineOfSight(ax, ay, bx, by, pad = NAV.agentClearance * 0.85) {
+    for (const b of this.blockers) {
+      if (segmentHitsCircle(ax, ay, bx, by, b.x, b.y, b.r + pad)) return false;
+    }
+    const d = dist(ax, ay, bx, by);
+    const steps = Math.max(2, Math.ceil(d / 0.6));
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      if (!this.insideArena(ax + (bx - ax) * t, ay + (by - ay) * t, pad * 0.6)) return false;
+    }
+    return true;
+  }
+
+  /**
+   * A* + string pulling. Returns an array of world-space waypoints (excluding
+   * the start), or null when unreachable.
+   */
+  findPath(sx, sy, tx, ty) {
+    if (this.lineOfSight(sx, sy, tx, ty)) return [{ x: tx, y: ty }];
+
+    const start = this.nearestFree(this.gx(sx), this.gy(sy));
+    const goal = this.nearestFree(this.gx(tx), this.gy(ty));
+    if (!start || !goal) return null;
+
+    const cols = this.cols;
+    const total = cols * this.rows;
+    const sIdx = start[1] * cols + start[0];
+    const gIdx = goal[1] * cols + goal[0];
+    if (sIdx === gIdx) return [{ x: tx, y: ty }];
+
+    const gScore = new Float32Array(total).fill(Infinity);
+    const cameFrom = new Int32Array(total).fill(-1);
+    const closed = new Uint8Array(total);
+    const open = new MinHeap();
+
+    const h = (i) => {
+      const ax = i % cols, ay = (i / cols) | 0;
+      const bx = gIdx % cols, by = (gIdx / cols) | 0;
+      const dx = Math.abs(ax - bx), dy = Math.abs(ay - by);
+      return (dx + dy) + (Math.SQRT2 - 2) * Math.min(dx, dy);
+    };
+
+    gScore[sIdx] = 0;
+    open.push({ i: sIdx, f: h(sIdx) });
+
+    const NB = [
+      [1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1],
+      [1, 1, Math.SQRT2], [1, -1, Math.SQRT2], [-1, 1, Math.SQRT2], [-1, -1, Math.SQRT2],
+    ];
+
+    let found = false;
+    let guard = 0;
+    while (open.size && guard++ < 20000) {
+      const cur = open.pop();
+      if (closed[cur.i]) continue;
+      closed[cur.i] = 1;
+      if (cur.i === gIdx) { found = true; break; }
+
+      const cx = cur.i % cols;
+      const cy = (cur.i / cols) | 0;
+      for (const [dx, dy, cost] of NB) {
+        const nx = cx + dx, ny = cy + dy;
+        if (this.isBlocked(nx, ny)) continue;
+        // No squeezing diagonally between two blockers.
+        if (dx && dy && (this.isBlocked(cx + dx, cy) || this.isBlocked(cx, cy + dy))) continue;
+        const ni = ny * cols + nx;
+        if (closed[ni]) continue;
+        const ng = gScore[cur.i] + cost;
+        if (ng < gScore[ni]) {
+          gScore[ni] = ng;
+          cameFrom[ni] = cur.i;
+          open.push({ i: ni, f: ng + h(ni) });
+        }
+      }
+    }
+    if (!found) return null;
+
+    // Reconstruct, then string-pull.
+    const raw = [];
+    let i = gIdx;
+    while (i !== -1) {
+      raw.push({ x: this.wx(i % cols), y: this.wy((i / cols) | 0) });
+      if (i === sIdx) break;
+      i = cameFrom[i];
+    }
+    raw.reverse();
+    raw[0] = { x: sx, y: sy };
+    raw.push({ x: tx, y: ty });
+
+    const out = [];
+    let anchor = 0;
+    for (let k = 2; k < raw.length; k++) {
+      if (!this.lineOfSight(raw[anchor].x, raw[anchor].y, raw[k].x, raw[k].y)) {
+        out.push(raw[k - 1]);
+        anchor = k - 1;
+      }
+    }
+    out.push(raw[raw.length - 1]);
+    return out;
+  }
+}
+
+class PathFollower {
+  constructor(grid) {
+    this.grid = grid;
+    this.path = null;
+    this.index = 0;
+    this.goal = null;
+    this.timer = 0;
+    this.failed = false;
+  }
+
+  setGoal(x, y, force = false) {
+    if (!force && this.goal && dist(this.goal.x, this.goal.y, x, y) < 1.2) return;
+    this.goal = { x, y };
+    this.timer = 0;
+    this._repath = true;
+  }
+
+  clear() {
+    this.path = null;
+    this.goal = null;
+    this.index = 0;
+  }
+
+  /**
+   * @returns {[number, number]} unit-ish desired direction, or [0,0] when arrived.
+   */
+  steer(x, y, dt) {
+    if (!this.goal) return [0, 0];
+    this.timer -= dt;
+    if (this._repath || this.timer <= 0 || !this.path) {
+      this._repath = false;
+      this.timer = NAV.repathInterval;
+      this.path = this.grid.findPath(x, y, this.goal.x, this.goal.y);
+      this.index = 0;
+      this.failed = !this.path;
+      if (!this.path) {
+        // Unreachable: fall back to a straight bee-line so the bot still moves.
+        const dx = this.goal.x - x, dy = this.goal.y - y;
+        const l = Math.hypot(dx, dy) || 1;
+        return [dx / l, dy / l];
+      }
+    }
+
+    while (this.index < this.path.length - 1) {
+      const w = this.path[this.index];
+      if (dist(x, y, w.x, w.y) < NAV.waypointReach) this.index++;
+      else break;
+    }
+    // Greedy skip: if a later waypoint is already visible, cut to it.
+    for (let k = this.path.length - 1; k > this.index; k--) {
+      if (this.grid.lineOfSight(x, y, this.path[k].x, this.path[k].y)) { this.index = k; break; }
+    }
+
+    const w = this.path[this.index];
+    const dx = w.x - x, dy = w.y - y;
+    const l = Math.hypot(dx, dy);
+    if (l < 0.05) return [0, 0];
+    return [dx / l, dy / l];
+  }
+
+  distanceToGoal(x, y) {
+    if (!this.goal) return Infinity;
+    if (!this.path) return dist(x, y, this.goal.x, this.goal.y);
+    let total = dist(x, y, this.path[this.index].x, this.path[this.index].y);
+    for (let k = this.index; k < this.path.length - 1; k++) {
+      total += dist(this.path[k].x, this.path[k].y, this.path[k + 1].x, this.path[k + 1].y);
+    }
+    return total;
+  }
+}
+
+/** Steer away from nearby dynamic agents so bots don't clump into a scrum. */
+function separation(self, others, radius = 2.4) {
+  let sx = 0, sy = 0;
+  for (const o of others) {
+    if (o === self || !o.alive) continue;
+    const dx = self.x - o.x;
+    const dy = self.y - o.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 1e-4 && d < radius) {
+      const w = (radius - d) / radius;
+      sx += (dx / d) * w;
+      sy += (dy / d) * w;
+    }
+  }
+  return [sx, sy];
+}
+
+__exports.__set({ NavGrid, PathFollower, separation });
+
+};
+
+__defs["src/game/entities.js"] = function (__exports, __require) {
+/**
+ * Entities: Player, CoinPopper, BaseCamp, Shop, Rock and GoldPickup.
+ *
+ * Entities own their own state and presentation timers. Anything that needs to
+ * see more than one entity at a time (punch resolution, deposits, purchases)
+ * lives in world.js.
+ */
+
+const { PLAYER, COMBAT, POPPERS, CAMP, SHOP, PICKUP, UPGRADE, COLORS, ITEMS } = __require("src/config.js");
+const { clamp, damp, rotateToward, TAU, makeRng } = __require("src/core/math.js");
+
+const rng = makeRng(0x5eed);
+
+/* ------------------------------------------------------------------ Player */
+
+class Player {
+  constructor(index, opts = {}) {
+    this.index = index;
+    this.name = opts.name || `P${index + 1}`;
+    this.isHuman = !!opts.isHuman;
+    this.color = COLORS.players[index];
+    this.colorDark = COLORS.playersDark[index];
+    this.controller = opts.controller || null;
+    this.brain = null;              // set for AI players
+    this.home = opts.home;          // BaseCamp
+    this.alive = true;
+
+    this.x = opts.x || 0;
+    this.y = opts.y || 0;
+    this.vx = 0;
+    this.vy = 0;
+    this.facing = opts.facing ?? 0;
+
+    this.bag = 0;
+    this.scaleLevel = 0;
+    this.upgrades = Object.fromEntries(ITEMS.map((i) => [i.id, 0]));
+    this.canSteal = false;
+    this.purchases = [];
+    this.spent = 0;
+
+    // Combat state machine
+    this.phase = 'idle';            // idle | windup | active | recover
+    this.phaseTimer = 0;
+    this.cooldown = 0;
+    this.charging = false;
+    this.chargeTime = 0;
+    this.punchPower = 0;            // 0 = light, 1 = full charge
+    this.hitSet = new Set();
+    this.stun = 0;
+    this.invuln = 0;
+
+    this.dashTimer = 0;
+    this.dashCooldown = 0;
+    this.dashDirX = 0;
+    this.dashDirY = 0;
+
+    // Shop browsing
+    this.shop = null;
+    this.shopIndex = 0;
+    this.buyHold = 0;
+    this.cycleLock = 0;
+
+    // Presentation
+    this.squash = 1;
+    this.hitFlash = 0;
+    this.walkPhase = rng.angle();
+    this.glow = 0;
+    this.harvesting = 0;
+    this.depositing = 0;
+    this.lastStolenFrom = new Map();  // campIndex -> cooldown remaining
+
+    // Stats snapshot for HUD / results
+    this.stats = {
+      robbed: 0, lost: 0, mined: 0, banked: 0, punchesLanded: 0,
+      punchesTaken: 0, campRaids: 0, raidedFor: 0,
+    };
+  }
+
+  /* ---- derived stats ---- */
+  get scale() { return 1 + this.scaleLevel * UPGRADE.scaleStep; }
+  get radius() { return PLAYER.radius * this.scale; }
+  get bagCap() { return PLAYER.bagCapacity + this.upgrades.goldBagUp * UPGRADE.bagPerLevel; }
+  get bagSpace() { return Math.max(0, this.bagCap - this.bag); }
+  get bagFill() { return clamp(this.bag / this.bagCap, 0, 1); }
+  get attackMul() {
+    return (1 + this.upgrades.attackUp * UPGRADE.attackPerLevel)
+      * (1 + this.scaleLevel * UPGRADE.scalePowerPerLevel);
+  }
+  get defenseMul() {
+    return Math.pow(1 - UPGRADE.defensePerLevel, this.upgrades.defenseUp);
+  }
+  get reach() {
+    return COMBAT.punchReach * (1 + this.scaleLevel * UPGRADE.scaleReachPerLevel);
+  }
+  get campArmor() {
+    return Math.pow(1 - UPGRADE.campArmorPerLevel, this.upgrades.baseCampUp);
+  }
+  get depositRate() {
+    return CAMP.depositRate * (1 + this.upgrades.baseCampUp * UPGRADE.campDepositPerLevel);
+  }
+  get endBonusRate() {
+    return this.upgrades.baseCampUp * UPGRADE.campEndBonusPerLevel;
+  }
+  /** Heavy bags slow you down — carrying a fortune is a real risk. */
+  get speed() {
+    const load = 1 - 0.12 * this.bagFill;
+    return PLAYER.speed * (1 + this.scaleLevel * UPGRADE.scaleSpeedPerLevel) * load;
+  }
+  get busy() { return this.phase !== 'idle'; }
+  get canAct() { return this.stun <= 0; }
+  get chargeRatio() {
+    if (!this.charging) return 0;
+    const t = (this.chargeTime - COMBAT.chargeMinHold) / (COMBAT.chargeFull - COMBAT.chargeMinHold);
+    return clamp(t, 0, 1);
+  }
+
+  addGold(amount) {
+    const take = Math.min(amount, this.bagSpace);
+    this.bag += take;
+    return take;
+  }
+
+  /* ---- update ---- */
+  update(dt, world) {
+    const c = this.controller;
+    this.stun = Math.max(0, this.stun - dt);
+    this.invuln = Math.max(0, this.invuln - dt);
+    this.cooldown = Math.max(0, this.cooldown - dt);
+    this.dashCooldown = Math.max(0, this.dashCooldown - dt);
+    this.cycleLock = Math.max(0, this.cycleLock - dt);
+    this.hitFlash = Math.max(0, this.hitFlash - dt * 4);
+    this.harvesting = Math.max(0, this.harvesting - dt * 3);
+    this.depositing = Math.max(0, this.depositing - dt * 3);
+    for (const [k, v] of this.lastStolenFrom) {
+      const n = v - dt;
+      if (n <= 0) this.lastStolenFrom.delete(k); else this.lastStolenFrom.set(k, n);
+    }
+
+    const inShop = !!this.shop;
+    let ax = c ? c.ax : 0;
+    let ay = c ? c.ay : 0;
+    const mag = Math.hypot(ax, ay);
+    if (mag > 1) { ax /= mag; ay /= mag; }
+
+    if (this.canAct) {
+      this._updateAttack(dt, c, world);
+      if (inShop) this._updateShop(dt, c, world);
+      else if (c && c.action.pressed && this.dashCooldown <= 0 && this.phase === 'idle') {
+        this._startDash(ax, ay, world);
+      }
+    } else {
+      this.charging = false;
+      this.chargeTime = 0;
+      this.buyHold = 0;
+    }
+
+    // ---- movement ----
+    let speed = this.speed;
+    if (this.charging) speed *= COMBAT.chargeMoveSlow;
+    if (this.phase === 'windup' || this.phase === 'active') speed *= 0.35;
+    if (this.phase === 'recover') speed *= 0.6;
+
+    if (this.dashTimer > 0) {
+      this.dashTimer -= dt;
+      this.vx = this.dashDirX * PLAYER.dashSpeed;
+      this.vy = this.dashDirY * PLAYER.dashSpeed;
+      if (rng.chance(0.6)) {
+        world.fx.burst(this.x, this.y, {
+          count: 1, color: this.color, speed: [0.5, 2], life: [0.15, 0.3],
+          size: [0.12, 0.26], drag: 6,
+        });
+      }
+    } else if (this.canAct) {
+      const tvx = ax * speed;
+      const tvy = ay * speed;
+      const rate = (mag > 0.02 ? PLAYER.accel : PLAYER.friction) / Math.max(1, speed) * 3.4;
+      this.vx = damp(this.vx, tvx, rate, dt);
+      this.vy = damp(this.vy, tvy, rate, dt);
+    } else {
+      // Stunned: slide with the knockback.
+      this.vx = damp(this.vx, 0, PLAYER.knockbackDecay, dt);
+      this.vy = damp(this.vy, 0, PLAYER.knockbackDecay, dt);
+    }
+
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+
+    const moving = Math.hypot(this.vx, this.vy);
+    if (moving > 0.4 && this.canAct) {
+      this.walkPhase += dt * (6 + moving * 1.5);
+      const target = Math.atan2(this.vy, this.vx);
+      if (!this.charging && this.phase === 'idle') {
+        this.facing = rotateToward(this.facing, target, PLAYER.turnRate * dt);
+      } else {
+        this.facing = rotateToward(this.facing, target, PLAYER.turnRate * 0.35 * dt);
+      }
+    }
+    // Aim overrides facing while charging so heavies can be steered.
+    if (this.charging && mag > 0.2) {
+      this.facing = rotateToward(this.facing, Math.atan2(ay, ax), PLAYER.turnRate * 0.9 * dt);
+    }
+
+    // Squash & stretch
+    const targetSquash = this.phase === 'windup' ? 0.86
+      : this.phase === 'active' ? 1.18
+        : this.dashTimer > 0 ? 1.14
+          : 1 + Math.sin(this.walkPhase) * 0.05 * clamp(moving / 5, 0, 1);
+    this.squash = damp(this.squash, targetSquash, 18, dt);
+    this.glow = damp(this.glow, this.charging ? this.chargeRatio : 0, 12, dt);
+  }
+
+  _startDash(ax, ay, world) {
+    let dx = ax, dy = ay;
+    if (Math.hypot(dx, dy) < 0.1) { dx = Math.cos(this.facing); dy = Math.sin(this.facing); }
+    const l = Math.hypot(dx, dy) || 1;
+    this.dashDirX = dx / l;
+    this.dashDirY = dy / l;
+    this.dashTimer = PLAYER.dashTime;
+    this.dashCooldown = PLAYER.dashCooldown;
+    this.facing = Math.atan2(this.dashDirY, this.dashDirX);
+    world.fx.ring(this.x, this.y, { r0: 0.3, r1: 1.9, life: 0.24, color: this.color, width: 0.14 });
+    world.sfx.dash();
+  }
+
+  _updateAttack(dt, c, world) {
+    // Phase machine first so timings stay frame-exact.
+    if (this.phase !== 'idle') {
+      this.phaseTimer -= dt;
+      if (this.phaseTimer <= 0) {
+        if (this.phase === 'windup') {
+          this.phase = 'active';
+          this.phaseTimer = COMBAT.punchActive;
+          this.hitSet.clear();
+          // Lunge.
+          const p = 1 + this.punchPower * 1.6;
+          this.vx += Math.cos(this.facing) * 5.5 * p;
+          this.vy += Math.sin(this.facing) * 5.5 * p;
+          world.registerPunch(this);
+        } else if (this.phase === 'active') {
+          this.phase = 'recover';
+          this.phaseTimer = COMBAT.punchRecover * (1 + this.punchPower * 0.5);
+          if (this.hitSet.size === 0) world.sfx.whiff();
+        } else {
+          this.phase = 'idle';
+        }
+      }
+      return;
+    }
+
+    if (!c) return;
+
+    if (c.attack.down && this.cooldown <= 0 && !this.shop) {
+      this.charging = true;
+      this.chargeTime += dt;
+      // Only humans drive the charge whine — three bots would fight over it.
+      if (this.isHuman && this.chargeRatio > 0) world.sfx.charge(this.chargeRatio);
+      if (this.chargeRatio >= 1 && rng.chance(dt * 22)) {
+        const a = rng.angle();
+        world.fx.burst(this.x + Math.cos(a) * 1.2, this.y + Math.sin(a) * 1.2, {
+          count: 1, color: '#fff3c4', speed: [1, 3], life: [0.2, 0.4], size: [0.08, 0.16],
+          dir: a + Math.PI, spread: 1.2,
+        });
+      }
+    }
+
+    if (c.attack.released && this.cooldown <= 0 && !this.shop) {
+      const held = c.attack.releaseHold;
+      this.charging = false;
+      this.chargeTime = 0;
+      if (this.isHuman) world.sfx.chargeStop();
+      const ratio = clamp((held - COMBAT.chargeMinHold) / (COMBAT.chargeFull - COMBAT.chargeMinHold), 0, 1);
+      this.punchPower = held < COMBAT.chargeMinHold ? 0 : Math.max(0.001, ratio);
+      this.phase = 'windup';
+      this.phaseTimer = COMBAT.punchWindup * (1 + this.punchPower * 1.7);
+      this.cooldown = (this.punchPower > 0 ? COMBAT.chargeCooldown : COMBAT.punchCooldown);
+    }
+
+    if (!c.attack.down) {
+      this.charging = false;
+      this.chargeTime = 0;
+    }
+  }
+
+  _updateShop(dt, c, world) {
+    if (!c) return;
+    if (c.action.pressed && this.cycleLock <= 0) {
+      this.shopIndex = (this.shopIndex + 1) % ITEMS.length;
+      this.cycleLock = SHOP.cycleCooldown;
+      this.buyHold = 0;
+      world.sfx.pop();
+    }
+    if (c.attack.down) {
+      this.buyHold += dt;
+      if (this.buyHold >= SHOP.buyHold) {
+        this.buyHold = 0;
+        world.tryBuy(this, ITEMS[this.shopIndex].id);
+      }
+    } else {
+      this.buyHold = 0;
+    }
+  }
+
+  /** Punch hitbox origin & angle for the current active frame. */
+  punchOrigin() {
+    const r = this.radius + this.reach * (1 + this.punchPower * (COMBAT.chargeReachBonus / COMBAT.punchReach));
+    return {
+      x: this.x + Math.cos(this.facing) * r * 0.55,
+      y: this.y + Math.sin(this.facing) * r * 0.55,
+      range: r,
+    };
+  }
+
+  takeKnockback(dx, dy, force) {
+    const resist = 1 / (1 + this.upgrades.defenseUp * 0.18 + Math.max(0, this.scaleLevel) * 0.15);
+    this.vx += dx * force * resist;
+    this.vy += dy * force * resist;
+  }
+}
+
+/* -------------------------------------------------------------- CoinPopper */
+
+class CoinPopper {
+  constructor(kind, x, y, label) {
+    const def = POPPERS[kind];
+    this.kind = kind;
+    this.def = def;
+    this.x = x;
+    this.y = y;
+    this.label = label;
+    this.gold = def.start;
+    this.rate = def.ratePerMin / 60;
+    this.cap = def.cap;
+    this.radius = def.radius;
+    this.reach = def.reach;
+
+    this.shake = 0;             // current shake energy 0..1
+    this.shakePhase = rng.angle();
+    this.spinPhase = rng.angle();
+    this.popTimer = 0;
+    this.accum = 0;
+    this.harvestedThisFrame = 0;
+    this.bob = rng.angle();
+  }
+
+  get shakeX() { return Math.sin(this.shakePhase * 3.1) * this.shake * 0.42; }
+  get shakeY() { return Math.cos(this.shakePhase * 2.3) * this.shake * 0.42; }
+
+  addShake(v) { this.shake = clamp(this.shake + v, 0, 1.4); }
+
+  update(dt, world, rateMul = 1) {
+    this.shakePhase += dt * (22 + this.shake * 40);
+    this.spinPhase += dt * 1.4;
+    this.bob += dt * 2.1;
+    this.shake = Math.max(0, this.shake - dt * (2.4 + this.shake * 1.8));
+
+    // Generation ticks: pop a coin every time a whole gold piece accumulates
+    // in batches, which gives the machine a rhythmic shudder.
+    const before = this.gold;
+    this.accum += this.rate * rateMul * dt;
+    const whole = Math.floor(this.accum);
+    if (whole > 0) {
+      this.accum -= whole;
+      this.gold = Math.min(this.cap, this.gold + whole);
+    }
+    this.popTimer -= dt;
+    if (this.gold > before && this.popTimer <= 0 && this.gold < this.cap) {
+      this.popTimer = this.kind === 'big' ? 0.34 : 0.6;
+      this.addShake(0.2);
+      world.fx.burst(this.x, this.y - this.radius * 0.4, {
+        count: 2, color: COLORS.gold, speed: [2, 5.5], life: [0.3, 0.55],
+        size: [0.11, 0.2], dir: -Math.PI / 2, spread: 2.0, gravity: 12, drag: 1.4, shape: 'coin',
+      });
+      world.sfx.pop();
+    }
+
+    this.harvestedThisFrame = 0;
+  }
+
+  /** Pull gold into a player's bag. Returns the amount transferred. */
+  harvest(player, dt, world) {
+    if (this.gold <= 0 || player.bagSpace <= 0) return 0;
+    const want = this.def.harvestRate * dt;
+    const take = Math.min(want, this.gold, player.bagSpace);
+    if (take <= 0) return 0;
+    this.gold -= take;
+    player.bag += take;
+    player.stats.mined += take;
+    this.harvestedThisFrame += take;
+    this.addShake(dt * 3.4);
+    player.harvesting = 1;
+    if (rng.chance(dt * 26)) {
+      const a = Math.atan2(player.y - this.y, player.x - this.x) + rng.range(-0.5, 0.5);
+      world.fx.burst(this.x + Math.cos(a) * this.radius, this.y + Math.sin(a) * this.radius, {
+        count: 1, color: COLORS.gold, speed: [3, 6], life: [0.16, 0.3], size: [0.1, 0.18],
+        dir: a, spread: 0.6, shape: 'coin', drag: 2,
+      });
+      world.sfx.coin(rng.range(-1, 2));
+    }
+    return take;
+  }
+}
+
+/* ---------------------------------------------------------------- BaseCamp */
+
+class BaseCamp {
+  constructor(ownerIndex, x, y) {
+    this.owner = ownerIndex;
+    this.x = x;
+    this.y = y;
+    this.radius = CAMP.radius;
+    this.vault = 0;
+    this.color = COLORS.players[ownerIndex];
+    this.colorDark = COLORS.playersDark[ownerIndex];
+    this.shake = 0;
+    this.shakePhase = rng.angle();
+    this.flash = 0;
+    this.alarm = 0;
+    this.pulse = rng.angle();
+    this.depositGlow = 0;
+  }
+
+  get shakeX() { return Math.sin(this.shakePhase * 3.3) * this.shake * 0.4; }
+  get shakeY() { return Math.cos(this.shakePhase * 2.1) * this.shake * 0.4; }
+
+  update(dt) {
+    this.shakePhase += dt * 26;
+    this.pulse += dt * 2.4;
+    this.shake = Math.max(0, this.shake - dt * 3.2);
+    this.flash = Math.max(0, this.flash - dt * 3);
+    this.alarm = Math.max(0, this.alarm - dt);
+    this.depositGlow = Math.max(0, this.depositGlow - dt * 2.5);
+  }
+}
+
+/* -------------------------------------------------------------------- Shop */
+
+class Shop {
+  constructor(id, x, y) {
+    this.id = id;
+    this.x = x;
+    this.y = y;
+    this.radius = SHOP.radius;
+    this.bob = rng.angle();
+    this.flash = 0;
+    this.customers = new Set();
+  }
+
+  update(dt) {
+    this.bob += dt * 1.8;
+    this.flash = Math.max(0, this.flash - dt * 2.6);
+  }
+}
+
+/* -------------------------------------------------------------------- Rock */
+
+class Rock {
+  constructor(x, y, r, seed) {
+    this.x = x;
+    this.y = y;
+    this.radius = r;
+    this.seed = seed;
+    this.points = [];
+    const n = 8;
+    const rr = makeRng(seed);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * TAU;
+      const rad = r * rr.range(0.82, 1.12);
+      this.points.push([Math.cos(a) * rad, Math.sin(a) * rad]);
+    }
+  }
+}
+
+/* -------------------------------------------------------------- GoldPickup */
+
+class GoldPickup {
+  constructor(x, y, amount, vx = 0, vy = 0, ownerIndex = -1) {
+    this.x = x;
+    this.y = y;
+    this.vx = vx;
+    this.vy = vy;
+    this.amount = amount;
+    this.life = PICKUP.life;
+    this.owner = ownerIndex;      // brief no-pickup window for the victim
+    this.lock = PICKUP.autoPickupDelay;
+    this.spin = rng.range(-8, 8);
+    this.rot = rng.angle();
+    this.bob = rng.angle();
+    this.dead = false;
+  }
+
+  update(dt, players) {
+    this.life -= dt;
+    this.lock = Math.max(0, this.lock - dt);
+    this.bob += dt * 5;
+    this.rot += this.spin * dt;
+    this.spin *= Math.exp(-2 * dt);
+    if (this.life <= 0) { this.dead = true; return; }
+
+    const drag = Math.exp(-PICKUP.drag * dt);
+    this.vx *= drag;
+    this.vy *= drag;
+
+    // Magnet toward the closest eligible player.
+    let best = null, bestD = PICKUP.magnetRange;
+    for (const p of players) {
+      if (!p.alive || p.bagSpace <= 0) continue;
+      if (this.lock > 0 && p.index === this.owner) continue;
+      const d = Math.hypot(p.x - this.x, p.y - this.y);
+      if (d < bestD) { bestD = d; best = p; }
+    }
+    if (best) {
+      const k = 1 - bestD / PICKUP.magnetRange;
+      const dx = best.x - this.x, dy = best.y - this.y;
+      const l = Math.hypot(dx, dy) || 1;
+      this.vx += (dx / l) * PICKUP.magnetSpeed * k * dt * 6;
+      this.vy += (dy / l) * PICKUP.magnetSpeed * k * dt * 6;
+    }
+
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+  }
+
+  get fading() { return this.life < 3; }
+}
+
+/** Explodes `total` gold into physical coin blobs on the floor. */
+function scatterGold(world, x, y, total, ownerIndex, dir = null) {
+  let left = total;
+  const guard = 40;
+  let n = 0;
+  while (left > 0.5 && n++ < guard) {
+    const amt = Math.min(left, PICKUP.clumpSize * rng.range(0.7, 1.3));
+    left -= amt;
+    const a = dir === null ? rng.angle() : dir + rng.range(-1.1, 1.1);
+    const s = rng.range(PICKUP.scatterSpeed[0], PICKUP.scatterSpeed[1]);
+    world.pickups.push(new GoldPickup(
+      x + Math.cos(a) * 0.3, y + Math.sin(a) * 0.3,
+      Math.round(amt), Math.cos(a) * s, Math.sin(a) * s, ownerIndex,
+    ));
+  }
+}
+
+__exports.__set({ Player, CoinPopper, BaseCamp, Shop, Rock, GoldPickup, scatterGold });
+
+};
+
+__defs["src/game/npc.js"] = function (__exports, __require) {
+/**
+ * NPC brain.
+ *
+ * Bots are *not* scripted: every tick they score a handful of candidate goals
+ * (mine, bank, mug a carrier, shop, raid a vault, grab loose coins, run away)
+ * and commit to the winner with a bit of hysteresis. Personality weights from
+ * NPC_PROFILES bias those scores, so "Bruno" hunts players while "Coinsworth"
+ * quietly farms and banks.
+ *
+ * Movement goes through PathFollower (A* + string pulling) so bots route around
+ * rocks and shops instead of grinding into them.
+ */
+
+const { CAMP, SHOP, ITEMS, COMBAT, MATCH } = __require("src/config.js");
+const { clamp, dist, makeRng } = __require("src/core/math.js");
+const { PathFollower, separation } = __require("src/game/nav.js");
+const { levelOf, priceOf, isMaxed, funds } = __require("src/game/items.js");
+
+const GOALS = ['mine', 'bank', 'hunt', 'shop', 'raid', 'loot', 'flee'];
+
+class NpcBrain {
+  constructor(player, profile, difficulty, grid, seed = 1) {
+    this.p = player;
+    this.profile = profile;
+    this.diff = difficulty;
+    this.rng = makeRng(seed);
+    this.follow = new PathFollower(grid);
+
+    this.goal = 'mine';
+    this.target = null;
+    this.goalScore = 0;
+    this.think = 0;
+    this.reaction = 0;
+    this.attackHold = 0;       // >0 => hold the punch button
+    this.wantCharge = false;
+    this.actionPulse = 0;
+    this.shopWant = null;
+    this.shopCooldown = 0;
+    this.shopPurchaseMark = 0;
+    this.lastShop = null;
+    this.stuckTimer = 0;
+    this.lastPos = { x: player.x, y: player.y };
+    this.wanderAngle = this.rng.angle();
+    this.dashUrge = 0;
+  }
+
+  /* ------------------------------------------------------------ utilities */
+
+  travelTime(x, y) {
+    const d = dist(this.p.x, this.p.y, x, y);
+    return d / Math.max(1.5, this.p.speed * this.diff.speed);
+  }
+
+  /** Taste ranking over the shelf, optionally capped by a price ceiling. */
+  _rankItems(world, maxPrice = Infinity) {
+    const bias = this.profile.shopBias;
+    let best = null, bestScore = 0;
+    for (const def of ITEMS) {
+      if (isMaxed(this.p, def.id)) continue;
+      if (priceOf(this.p, def.id) > maxPrice) continue;
+      const w = (bias[def.id] ?? 0.5);
+      if (w <= 0.05) continue;
+      let score = w * (1 - levelOf(this.p, def.id) * 0.12);
+      if (def.id === 'steal') score *= 0.6 + this.profile.stealWill;
+      if (def.id === 'baseCampUp' && world.leaderIndex === this.p.index) score *= 1.4;
+      if (score > bestScore) { bestScore = score; best = def; }
+    }
+    return best;
+  }
+
+  /**
+   * What this bot should buy on its next shop run, or null.
+   *
+   * Shops bill the bag first and the vault for the rest, so "can I afford it"
+   * is simply funds vs price. Bots keep a late-match reserve: spending vault
+   * gold in the closing seconds would just donate the win away.
+   *
+   * @param {boolean} affordableOnly restrict to what it can pay for right now
+   */
+  desiredItem(world, affordableOnly = false) {
+    const p = this.p;
+    this.dreamId = null;
+
+    const dream = this._rankItems(world);
+    if (!dream) return null;
+    this.dreamId = dream.id;
+    if (!affordableOnly) return dream;
+
+    // Spending discipline: the vault is the score, so a bot only dips into it
+    // while there is still time to earn the gold back. The reserve it refuses
+    // to touch ramps up as the clock runs down.
+    const reserve = (1 - world.timeLeft / MATCH.duration) * 150;
+    const budget = Math.max(0, funds(p) - reserve);
+    if (budget >= priceOf(p, dream.id)) return dream;
+
+    // Otherwise take the best thing the budget does cover.
+    let best = null, bestPrice = 0;
+    for (const def of ITEMS) {
+      if (isMaxed(p, def.id)) continue;
+      const price = priceOf(p, def.id);
+      if (price > budget) continue;
+      const w = (this.profile.shopBias[def.id] ?? 0.5);
+      if (w <= 0.05) continue;
+      if (!best || w > bestPrice) { best = def; bestPrice = w; }
+    }
+    return best;
+  }
+
+  nearestThreat(world) {
+    let best = null, bestD = Infinity;
+    for (const o of world.players) {
+      if (o === this.p || !o.alive) continue;
+      const d = dist(this.p.x, this.p.y, o.x, o.y);
+      if (d < bestD) { bestD = d; best = o; }
+    }
+    return { who: best, d: bestD };
+  }
+
+  /* --------------------------------------------------------- goal scoring */
+
+  evaluate(world) {
+    const p = this.p;
+    const timeLeft = world.timeLeft;
+    const scores = {};
+    const targets = {};
+
+    // ---- shopping intent (drives both the shop goal and how eager we are to bank)
+    const homeD = this.travelTime(p.home.x, p.home.y);
+    const endgame = timeLeft < homeD + 4;
+    const shopWant = (this.shopCooldown <= 0 && !endgame) ? this.desiredItem(world, true) : null;
+
+    // ---- bank ------------------------------------------------------------
+    if (p.bag > 0) {
+      const fill = p.bag / p.bagCap;
+      let s = (p.bag / 35) * (0.6 + this.profile.saveGoldWill * 1.3) / (homeD * 0.5 + 1);
+      s *= 0.6 + fill * 1.3;
+      if (endgame) s += 100;                       // bagged gold scores nothing
+      if (p.bagSpace <= 1) s *= 1.8;               // full bag: nothing else to do
+      if (p.home.vault < 50) s *= 1.5;             // get something on the board first
+      scores.bank = s;
+      targets.bank = p.home;
+    }
+
+    // ---- mine ------------------------------------------------------------
+    if (p.bagSpace > 3 && !endgame) {
+      for (const pop of world.poppers) {
+        const gettable = Math.min(pop.gold, p.bagSpace);
+        if (gettable < 3) continue;
+        const t = this.travelTime(pop.x, pop.y);
+        const contest = world.playersNear(pop.x, pop.y, pop.reach + 2.5, p).length;
+        let s = (gettable / 40) * (0.9 + this.profile.greed * 0.5) / (t * 0.5 + 1);
+        s *= 1 - contest * 0.18 * (1 - this.profile.attackWill);
+        if (pop.kind === 'big') s *= 1.12;
+        if (this.goal === 'mine' && this.target === pop) s *= 1.15;   // hysteresis
+        if (!scores.mine || s > scores.mine) { scores.mine = s; targets.mine = pop; }
+      }
+    }
+
+    // ---- hunt ------------------------------------------------------------
+    for (const o of world.players) {
+      if (o === p || !o.alive) continue;
+      const loot = Math.min(o.bag, p.bagSpace);
+      if (loot < 5) continue;
+      const t = this.travelTime(o.x, o.y);
+      if (t > 3.2 && this.profile.attackWill < 0.7) continue;
+      // Chasing is expensive: it only wins when the mark is close and loaded.
+      let s = (loot / 45) * (0.3 + this.profile.attackWill * 1.5) / (t * 1.25 + 1);
+      if (o.stun > 0) s *= 1.5;
+      if (o.upgrades.defenseUp > p.upgrades.attackUp + 1) s *= 0.7;
+      if (o.index === world.leaderIndex) s *= 1.3;   // whoever is winning gets the attention
+      if (this.goal === 'hunt' && this.target === o) s *= 1.2;
+      if (!scores.hunt || s > scores.hunt) { scores.hunt = s; targets.hunt = o; }
+    }
+
+    // ---- shop ------------------------------------------------------------
+    if (shopWant) {
+      let bestShop = null, bestT = Infinity;
+      for (const sh of world.shops) {
+        const t = this.travelTime(sh.x, sh.y);
+        if (t < bestT) { bestT = t; bestShop = sh; }
+      }
+      if (bestShop) {
+        // Finally affording the thing you actually wanted beats another ore run.
+        const eager = shopWant.id === this.dreamId ? 1.6 : 1.0;
+        scores.shop = (0.85 + this.profile.shopWill * 1.4) / (bestT * 0.45 + 1) * 1.25 * eager;
+        targets.shop = bestShop;
+        this.shopWant = shopWant.id;
+      }
+    }
+
+    // ---- raid ------------------------------------------------------------
+    if (p.canSteal && p.bagSpace > 4 && !endgame) {
+      for (const camp of world.camps) {
+        if (camp.owner === p.index) continue;
+        if (p.lastStolenFrom.get(camp.owner) > 0) continue;
+        const owner = world.players[camp.owner];
+        const loot = Math.min(camp.vault * CAMP.stealFraction * owner.campArmor, CAMP.stealCap, p.bagSpace);
+        if (loot < 6) continue;
+        const t = this.travelTime(camp.x, camp.y);
+        const guarded = dist(owner.x, owner.y, camp.x, camp.y) < 8 ? 0.55 : 1;
+        // A stocked vault is worth a long walk — one punch can out-earn a whole
+        // ore run, which is the entire point of paying for Steal.
+        let s = (loot / 26) * (0.55 + this.profile.stealWill * 2.5) / (t * 0.35 + 1) * guarded;
+        if (camp.owner === world.leaderIndex) s *= 1.3;
+        if (!scores.raid || s > scores.raid) { scores.raid = s; targets.raid = camp; }
+      }
+    }
+
+    // ---- loot ------------------------------------------------------------
+    if (p.bagSpace > 3) {
+      for (const g of world.pickups) {
+        if (g.dead) continue;
+        const t = this.travelTime(g.x, g.y);
+        if (t > 2.2) continue;
+        const s = (g.amount / 25) * (0.9 + this.profile.greed) / (t * 1.4 + 0.6);
+        if (!scores.loot || s > scores.loot) { scores.loot = s; targets.loot = g; }
+      }
+    }
+
+    // ---- flee ------------------------------------------------------------
+    const threat = this.nearestThreat(world);
+    const FLEE_RANGE = 6;
+    if (threat.who && p.bag > p.bagCap * 0.5 && threat.d < FLEE_RANGE && threat.who.stun <= 0) {
+      const danger = (1 - threat.d / FLEE_RANGE) * threat.who.attackMul;
+      let s = danger * (0.3 + this.profile.caution * 1.5) * (p.bag / p.bagCap) * 0.9;
+      if (threat.who.charging) s *= 1.6;      // a wound-up smash is worth dodging
+      scores.flee = s;
+      targets.flee = p.home;
+    }
+
+    let bestGoal = 'mine', best = -Infinity;
+    for (const g of GOALS) {
+      const s = scores[g] ?? -Infinity;
+      if (s > best) { best = s; bestGoal = g; }
+    }
+    if (best === -Infinity) { bestGoal = 'mine'; targets.mine = world.poppers[0]; }
+
+    this.goal = bestGoal;
+    this.target = targets[bestGoal] || null;
+    this.goalScore = best;
+    if (bestGoal !== 'shop') this.shopWant = null;   // never act on a stale plan
+  }
+
+  /* --------------------------------------------------------------- update */
+
+  update(dt, world) {
+    const p = this.p;
+    const c = p.controller;
+    if (!c) return;
+    this.shopCooldown = Math.max(0, this.shopCooldown - dt);
+    this.attackHold = Math.max(0, this.attackHold - dt);
+    this.actionPulse = Math.max(0, this.actionPulse - dt);
+    this.dashUrge = Math.max(0, this.dashUrge - dt);
+
+    // Reaction delay makes lower difficulties feel human.
+    this.think -= dt;
+    if (this.think <= 0) {
+      this.think = this.diff.react + this.rng.range(0, 0.12);
+      this.evaluate(world);
+    }
+
+    c.want.attack = false;
+    c.want.action = false;
+
+    if (p.shop !== this.lastShop) {
+      this.lastShop = p.shop;
+      if (p.shop) this.shopPurchaseMark = p.purchases.length;
+    }
+    if (p.shop) { this._shopBehaviour(dt, world); return; }
+
+    const goalPos = this._goalPosition(world);
+    if (goalPos) this.follow.setGoal(goalPos.x, goalPos.y);
+    else this.follow.clear();
+
+    let [dx, dy] = this.follow.steer(p.x, p.y, dt);
+
+    // Local avoidance so bots don't pile up on each other.
+    const [sx, sy] = separation(p, world.players, p.radius * 2.6);
+    dx += sx * 0.85;
+    dy += sy * 0.85;
+
+    // Anti-stuck: if we've barely moved while wanting to move, jitter + repath.
+    const moved = dist(p.x, p.y, this.lastPos.x, this.lastPos.y);
+    this.lastPos.x = p.x; this.lastPos.y = p.y;
+    if (moved < 0.02 && (dx || dy)) {
+      this.stuckTimer += dt;
+      if (this.stuckTimer > 0.5) {
+        this.wanderAngle += this.rng.range(1.4, 2.6);
+        dx += Math.cos(this.wanderAngle) * 1.4;
+        dy += Math.sin(this.wanderAngle) * 1.4;
+        this.follow.setGoal(goalPos ? goalPos.x : p.x, goalPos ? goalPos.y : p.y, true);
+        this.stuckTimer = 0;
+      }
+    } else this.stuckTimer = 0;
+
+    const l = Math.hypot(dx, dy);
+    if (l > 1e-4) { dx /= l; dy /= l; }
+    c.want.ax = dx;
+    c.want.ay = dy;
+
+    this._combatBehaviour(dt, world, dx, dy);
+  }
+
+  _goalPosition(world) {
+    const p = this.p;
+    const t = this.target;
+    if (!t) return null;
+    switch (this.goal) {
+      case 'mine': {
+        // Stand just inside the harvest ring, on our side of the machine.
+        const a = Math.atan2(p.y - t.y, p.x - t.x);
+        const r = t.radius + p.radius + 0.5;
+        return { x: t.x + Math.cos(a) * r, y: t.y + Math.sin(a) * r };
+      }
+      case 'bank':
+        return { x: p.home.x, y: p.home.y };
+      case 'flee':
+        return { x: p.home.x, y: p.home.y };
+      case 'hunt': {
+        // Lead the target a little so we don't chase their exact past position.
+        const lead = this.diff.aim * 0.35;
+        return { x: t.x + t.vx * lead, y: t.y + t.vy * lead };
+      }
+      case 'shop':
+      case 'raid':
+      case 'loot':
+        return { x: t.x, y: t.y };
+      default:
+        return null;
+    }
+  }
+
+  _shopBehaviour(dt, world) {
+    const p = this.p;
+    const c = p.controller;
+    const wantId = this.shopWant || this.desiredItem(world, true)?.id;
+    if (!wantId) { this._leaveShop(c); return; }
+    const idx = ITEMS.findIndex((i) => i.id === wantId);
+    if (idx < 0 || isMaxed(p, wantId) || funds(p) < priceOf(p, wantId)) { this._leaveShop(c); return; }
+
+    if (p.shopIndex !== idx) {
+      // Tap the action key to advance the highlight (needs rising edges).
+      this.actionPulse -= dt;
+      c.want.action = this.actionPulse <= 0;
+      if (c.want.action) this.actionPulse = SHOP.cycleCooldown + 0.06;
+    } else {
+      c.want.attack = true;      // hold to confirm
+      if (p.purchases.length > this.shopPurchaseMark) {
+        this.shopPurchaseMark = p.purchases.length;
+        this.shopWant = null;
+        this.shopCooldown = 7;
+        this._leaveShop(c);
+      }
+    }
+    // Drift out of the shop zone once done.
+    c.want.ax = 0;
+    c.want.ay = 0;
+  }
+
+  _leaveShop(c) {
+    const p = this.p;
+    this.shopCooldown = Math.max(this.shopCooldown, 3);
+    const away = Math.atan2(p.y - p.shop.y, p.x - p.shop.x);
+    c.want.ax = Math.cos(away);
+    c.want.ay = Math.sin(away);
+    c.want.attack = false;
+    c.want.action = false;
+  }
+
+  _combatBehaviour(dt, world, dx, dy) {
+    const p = this.p;
+    const c = p.controller;
+    if (!p.canAct || p.busy) { this.attackHold = 0; return; }
+
+    // Raiding a vault: punch the camp itself.
+    if (this.goal === 'raid' && this.target) {
+      const d = dist(p.x, p.y, this.target.x, this.target.y);
+      if (d < this.target.radius + p.radius + p.reach * 0.85) {
+        this._aimAt(c, this.target.x, this.target.y);
+        this.attackHold = 0.02;                     // light taps are enough
+        c.want.attack = true;
+        return;
+      }
+    }
+
+    // Punching a player.
+    const victim = this.goal === 'hunt' ? this.target : this._opportunisticTarget(world);
+    if (victim) {
+      const d = dist(p.x, p.y, victim.x, victim.y);
+      const reach = p.radius + victim.radius + p.reach;
+      const chargeWorthy = victim.bag > 25 && this.rng() < this.diff.chargeSkill;
+
+      if (d < reach * 2.4 && this.rng() < this.diff.aim) this._aimAt(c, victim.x, victim.y);
+
+      if (d < reach * 3.0 && d > reach * 1.05 && p.dashCooldown <= 0
+          && this.dashUrge <= 0 && this.rng() < this.diff.chargeSkill * 0.5) {
+        c.want.action = true;                        // dash in
+        this.dashUrge = 1.6;
+      }
+
+      if (this.wantCharge || chargeWorthy) {
+        this.wantCharge = true;
+        c.want.attack = true;                        // keep holding
+        const full = p.chargeRatio >= 0.85 - (1 - this.diff.chargeSkill) * 0.5;
+        if (d <= reach * 0.95 && (full || p.chargeRatio > 0.35)) {
+          c.want.attack = false;                     // release into the hit
+          this.wantCharge = false;
+        } else if (p.chargeTime > COMBAT.chargeFull * 1.9) {
+          c.want.attack = false;                     // don't hold forever
+          this.wantCharge = false;
+        }
+      } else if (d <= reach * 0.95) {
+        this.attackHold = 0.02;
+        c.want.attack = true;
+      }
+    } else {
+      this.wantCharge = false;
+    }
+
+    // Escape dash when fleeing with a fat bag.
+    if (this.goal === 'flee' && p.dashCooldown <= 0 && this.dashUrge <= 0) {
+      c.want.action = true;
+      this.dashUrge = 1.2;
+    }
+  }
+
+  /** Someone standing right next to us with loot worth taking. */
+  _opportunisticTarget(world) {
+    const p = this.p;
+    if (this.profile.attackWill < 0.15) return null;
+    let best = null, bestD = Infinity;
+    for (const o of world.players) {
+      if (o === p || !o.alive) continue;
+      const d = dist(p.x, p.y, o.x, o.y);
+      const reach = p.radius + o.radius + p.reach;
+      if (d < reach * 1.25 && o.bag > 6 && p.bagSpace > 4 && d < bestD) { bestD = d; best = o; }
+    }
+    return best;
+  }
+
+  _aimAt(c, x, y) {
+    const p = this.p;
+    const a = Math.atan2(y - p.y, x - p.x);
+    const jitter = (1 - this.diff.aim) * 0.5;
+    const aa = a + this.rng.range(-jitter, jitter);
+    // Feed the aim through the movement stick: Player derives facing from it.
+    const blend = 0.65;
+    c.want.ax = c.want.ax * (1 - blend) + Math.cos(aa) * blend;
+    c.want.ay = c.want.ay * (1 - blend) + Math.sin(aa) * blend;
+  }
+
+  get debugLabel() {
+    return `${this.profile.tag}:${this.goal}`;
+  }
+}
+
+__exports.__set({ NpcBrain });
+
+};
+
+__defs["src/ui.js"] = function (__exports, __require) {
+/**
+ * DOM screens: the lobby (slot setup) and the results board.
+ * The match itself is drawn entirely on the canvas.
+ */
+
+const { KEY_SCHEMES, InputHub } = __require("src/core/input.js");
+const { NPC_PROFILES, DIFFICULTY, COLORS, MATCH, PLAYER, POPPERS, ITEMS } = __require("src/config.js");
+
+const CORNER_NAMES = ['North-West', 'North-East', 'South-West', 'South-East'];
+
+class Ui {
+  constructor(root, game) {
+    this.root = root;
+    this.game = game;
+    this.slots = [
+      { type: 'human', scheme: 'wasd', pad: -1, profile: 'allround' },
+      { type: 'cpu', scheme: 'ijkl', pad: -1, profile: 'bruiser' },
+      { type: 'cpu', scheme: 'arrows', pad: -1, profile: 'banker' },
+      { type: 'cpu', scheme: 'numpad', pad: -1, profile: 'thief' },
+    ];
+    this.difficulty = 'normal';
+  }
+
+  clear() { this.root.innerHTML = ''; this.root.className = 'overlay'; }
+
+  /* --------------------------------------------------------------- lobby */
+
+  showLobby() {
+    this.clear();
+    this.root.classList.add('show');
+    const pads = InputHub.connectedPads();
+
+    const el = document.createElement('div');
+    el.className = 'panel lobby';
+    el.innerHTML = `
+      <header>
+        <h1>GOLD<span>HUNTER</span></h1>
+        <p class="tagline">
+          Four prospectors. One motherlode. ${MATCH.duration / 60 === 2.5 ? '2·5' : MATCH.duration}
+          minutes to bank more gold than anyone else.
+        </p>
+      </header>
+      <div class="slots"></div>
+      <div class="row options">
+        <label>CPU skill
+          <select id="difficulty">
+            ${Object.entries(DIFFICULTY).map(([k, v]) =>
+    `<option value="${k}" ${k === this.difficulty ? 'selected' : ''}>${v.label}</option>`).join('')}
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" id="showpaths"> show AI paths</label>
+        <button class="start" id="start">START MATCH <kbd>Enter</kbd></button>
+      </div>
+      <div class="rules">
+        <div>
+          <h3>How to win</h3>
+          <ul>
+            <li>Only gold <b>inside your base camp</b> at the whistle counts. Carried gold is worth nothing.</li>
+            <li>Camps sit <b>25 m</b> from the centre <b>Motherlode</b> (${POPPERS.big.start}g, +${POPPERS.big.ratePerMin}/min).</li>
+            <li>Two small poppers hold ${POPPERS.small.start}g and pump +${POPPERS.small.ratePerMin}/min.</li>
+            <li>Your bag starts at <b>${PLAYER.bagCapacity}g</b> — walk it home before someone takes it.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Fighting &amp; shopping</h3>
+          <ul>
+            <li><b>Tap punch</b> for a quick jab, <b>hold</b> to charge a smash that rips far more gold.</li>
+            <li>Two shops sell ${ITEMS.length} upgrades. They bill your <b>bag first, then your vault</b> — so every upgrade costs you score.</li>
+            <li>Buy <b>Steal</b> to punch open enemy vaults.</li>
+            <li>Last ${MATCH.rushAt}s is the <b>Gold Rush</b>: poppers pump ${MATCH.rushPopperMultiplier}×.</li>
+          </ul>
+        </div>
+      </div>
+      <footer>Empty seats are filled by NPCs · <kbd>M</kbd> mute · <kbd>P</kbd> pause · <kbd>H</kbd> hints</footer>
+    `;
+    this.root.appendChild(el);
+
+    const slotsEl = el.querySelector('.slots');
+    this.slots.forEach((slot, i) => slotsEl.appendChild(this._slotCard(slot, i, pads)));
+
+    el.querySelector('#difficulty').addEventListener('change', (e) => { this.difficulty = e.target.value; });
+    el.querySelector('#showpaths').addEventListener('change', (e) => { this.game.debugAI = e.target.checked; });
+    el.querySelector('#start').addEventListener('click', () => this.game.startMatch());
+  }
+
+  _slotCard(slot, i, pads) {
+    const card = document.createElement('div');
+    card.className = 'slot';
+    card.style.setProperty('--c', COLORS.players[i]);
+    const schemeOpts = KEY_SCHEMES.map((s) =>
+      `<option value="k:${s.id}" ${slot.type === 'human' && slot.pad < 0 && slot.scheme === s.id ? 'selected' : ''}>${s.name}</option>`).join('');
+    const padOpts = pads.map((p) =>
+      `<option value="p:${p}" ${slot.pad === p ? 'selected' : ''}>Gamepad ${p + 1}</option>`).join('');
+    const profOpts = NPC_PROFILES.map((p) =>
+      `<option value="${p.id}" ${slot.profile === p.id ? 'selected' : ''}>${p.name} · ${p.tag}</option>`).join('');
+
+    card.innerHTML = `
+      <div class="slot-head">
+        <span class="chip"></span>
+        <b>P${i + 1}</b>
+        <span class="corner">${CORNER_NAMES[i]}</span>
+      </div>
+      <div class="toggle">
+        <button data-type="human" class="${slot.type === 'human' ? 'on' : ''}">HUMAN</button>
+        <button data-type="cpu" class="${slot.type === 'cpu' ? 'on' : ''}">NPC</button>
+      </div>
+      <div class="cfg human-cfg" ${slot.type === 'human' ? '' : 'hidden'}>
+        <select class="device">${schemeOpts}${padOpts}</select>
+        <small class="hint"></small>
+      </div>
+      <div class="cfg cpu-cfg" ${slot.type === 'cpu' ? '' : 'hidden'}>
+        <select class="profile">${profOpts}</select>
+        <small class="hint"></small>
+      </div>
+    `;
+
+    const humanCfg = card.querySelector('.human-cfg');
+    const cpuCfg = card.querySelector('.cpu-cfg');
+    const refresh = () => {
+      humanCfg.hidden = slot.type !== 'human';
+      cpuCfg.hidden = slot.type !== 'cpu';
+      card.classList.toggle('cpu', slot.type === 'cpu');
+      if (slot.type === 'human') {
+        const scheme = KEY_SCHEMES.find((s) => s.id === slot.scheme);
+        humanCfg.querySelector('.hint').textContent = slot.pad >= 0
+          ? 'Left stick · A punch · B dash'
+          : (scheme ? scheme.label : '');
+      } else {
+        const prof = NPC_PROFILES.find((p) => p.id === slot.profile);
+        cpuCfg.querySelector('.hint').textContent = prof
+          ? `atk ${pct(prof.attackWill)} · bank ${pct(prof.saveGoldWill)} · steal ${pct(prof.stealWill)}`
+          : '';
+      }
+    };
+
+    card.querySelectorAll('.toggle button').forEach((b) => {
+      b.addEventListener('click', () => {
+        slot.type = b.dataset.type;
+        card.querySelectorAll('.toggle button').forEach((x) => x.classList.toggle('on', x === b));
+        refresh();
+      });
+    });
+    card.querySelector('.device').addEventListener('change', (e) => {
+      const [kind, val] = e.target.value.split(':');
+      if (kind === 'k') { slot.scheme = val; slot.pad = -1; } else { slot.pad = Number(val); }
+      refresh();
+    });
+    card.querySelector('.profile').addEventListener('change', (e) => { slot.profile = e.target.value; refresh(); });
+    refresh();
+    return card;
+  }
+
+  /* ------------------------------------------------------------- results */
+
+  showResults(world) {
+    this.clear();
+    this.root.classList.add('show');
+    const rows = world.results;
+    const el = document.createElement('div');
+    el.className = 'panel results';
+    el.innerHTML = `
+      <header>
+        <h1 class="winner" style="color:${rows[0].color}">${rows[0].name} WINS</h1>
+        <p class="tagline">${Math.floor(rows[0].total)} gold banked · ${MATCH.duration}s match</p>
+      </header>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Player</th><th class="n">Vault</th><th class="n">Bonus</th>
+          <th class="n">Total</th><th class="n">Mined</th><th class="n">Robbed</th>
+          <th class="n">Lost</th><th class="n">Raids</th><th class="n">Hits</th></tr>
+        </thead>
+        <tbody>
+          ${rows.map((r) => `
+            <tr class="${r.place === 1 ? 'first' : ''}">
+              <td><span class="place">${r.place}</span></td>
+              <td><span class="dot" style="background:${r.color}"></span>${r.name}
+                <small>${r.isHuman ? 'human' : (r.profile ? r.profile.tag : 'cpu')}</small></td>
+              <td class="n">${Math.floor(r.vault)}</td>
+              <td class="n">${r.bonus > 0 ? '+' + Math.floor(r.bonus) : '—'}</td>
+              <td class="n strong">${Math.floor(r.total)}</td>
+              <td class="n">${Math.floor(r.stats.mined)}</td>
+              <td class="n">${Math.floor(r.stats.robbed + r.stats.raidedFor)}</td>
+              <td class="n">${Math.floor(r.stats.lost)}</td>
+              <td class="n">${r.stats.campRaids}</td>
+              <td class="n">${r.stats.punchesLanded}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+      <div class="row options">
+        <button class="start" id="rematch">REMATCH <kbd>R</kbd></button>
+        <button class="ghost" id="tolobby">CHANGE LINE-UP <kbd>Esc</kbd></button>
+      </div>
+    `;
+    this.root.appendChild(el);
+    el.querySelector('#rematch').addEventListener('click', () => this.game.startMatch());
+    el.querySelector('#tolobby').addEventListener('click', () => this.game.toLobby());
+  }
+
+  hide() {
+    this.clear();
+    this.root.classList.remove('show');
+  }
+
+  /** Turns the lobby config into World setup slots. */
+  buildSetup(hub) {
+    hub.clearControllers();
+    let humans = 0;
+    const slots = this.slots.map((slot, i) => {
+      if (slot.type === 'human') {
+        humans++;
+        const controller = slot.pad >= 0 ? hub.padController(slot.pad) : hub.keyboardController(slot.scheme);
+        return { type: 'human', controller, name: humans === 1 && this.humanCount() === 1 ? 'YOU' : `P${i + 1}` };
+      }
+      const profile = NPC_PROFILES.find((p) => p.id === slot.profile) || NPC_PROFILES[3];
+      return { type: 'cpu', controller: hub.virtual(profile.name), profile, name: profile.name };
+    });
+    return { slots, difficulty: this.difficulty, seed: (Math.random() * 0xffff) | 0 };
+  }
+
+  humanCount() { return this.slots.filter((s) => s.type === 'human').length; }
+}
+
+const pct = (v) => `${Math.round(v * 100)}%`;
+
+__exports.__set({ Ui });
+
+};
+
+  __require("src/main.js");
+})();
+
+</script>
+</body>
+</html>
